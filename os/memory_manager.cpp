@@ -11,23 +11,6 @@ namespace OS {
 
     }
 
-    MemoryManager* MemoryManager::instance = nullptr;
-
-    void MemoryManager::initialize(uint16_t memory_size) {
-        if (instance == nullptr) {
-            instance = new MemoryManager(memory_size);
-        }
-    }
-
-    MemoryManager* MemoryManager::getInstance() {
-        return instance;
-    }
-
-    void MemoryManager::shutdown() {
-        delete instance;
-        instance = nullptr;
-    }
-
     MemoryManager::~MemoryManager() = default;
 
     bool MemoryManager::allocate_memory_for_process(Process *process, uint16_t size_needed) {
@@ -46,7 +29,7 @@ namespace OS {
 
     void MemoryManager::free_memory(Process *process) {
         std::cout << "memoria foi freeada kk";
-        free(process);
+        delete process;
         // TODO: fazer isso direito
     }
 

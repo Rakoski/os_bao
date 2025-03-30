@@ -15,19 +15,10 @@ namespace OS {
     private:
         uint16_t next_free_addr;
         const uint16_t PHYSICAL_MEMORY_SIZE;
-        MemoryManager(uint16_t size);
-
-        static MemoryManager *instance;
 
     public:
+         explicit MemoryManager(uint16_t memory_size);
         ~MemoryManager();
-
-        MemoryManager(const MemoryManager&) = delete;
-        MemoryManager& operator=(const MemoryManager&) = delete;
-
-        static MemoryManager* getInstance();
-        static void initialize(uint16_t size);
-        static void shutdown();
 
         bool allocate_memory_for_process(Process* process, uint16_t size_needed);
         void free_memory(Process* process);
