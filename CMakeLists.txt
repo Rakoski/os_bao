@@ -22,6 +22,8 @@ add_executable(
         os/process.cpp
         os/process.h
         os/os.h
+        os/memory_manager.cpp
+        os/memory_manager.h
         arch/arch.cpp
         arch/arch.h
         arch/computer.h
