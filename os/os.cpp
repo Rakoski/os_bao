@@ -18,20 +18,25 @@ namespace OS {
 
 // ---------------------------------------
 
+Arch::Cpu *cpuglobal;
+
 void boot (Arch::Cpu *cpu)
 {
 	terminal_println(cpu, Arch::Terminal::Type::Command, "Type commands here");
 	terminal_println(cpu, Arch::Terminal::Type::App, "Apps output here");
 	terminal_println(cpu, Arch::Terminal::Type::Kernel, "Kernel output here");
-	terminal_print(cpu, Arch::Terminal::Type::Command, "aloooo");
-	memory_manager = new MemoryManager(UINT16_MAX);
+	cpuglobal = cpu;
 }
 
 // ---------------------------------------
 
+
 void interrupt (const Arch::InterruptCode interrupt)
 {
-
+	if (interrupt == Arch::InterruptCode::Keyboard) {
+		uint16_t io = cpuglobal->read_io(Arch::IO_Port::TerminalReadTypedChar);
+		terminal_print(cpuglobal, Arch::Terminal::Type::Command, (char) io);
+	}
 }
 
 // ---------------------------------------

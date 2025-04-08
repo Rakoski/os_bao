@@ -11,7 +11,6 @@ set(CMAKE_CXX_STANDARD 20)
 
 add_executable(
         os_bao2
-        main.cpp
         lib.cpp
         lib.h
         config.cpp
