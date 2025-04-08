@@ -49,10 +49,6 @@ namespace OS {
         cpu->set_vmem_paddr_base(base);
         cpu->set_vmem_size(limit);
     }
-
-
-
-
 }
 
 

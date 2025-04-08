@@ -23,6 +23,7 @@ void boot (Arch::Cpu *cpu)
 	terminal_println(cpu, Arch::Terminal::Type::Command, "Type commands here");
 	terminal_println(cpu, Arch::Terminal::Type::App, "Apps output here");
 	terminal_println(cpu, Arch::Terminal::Type::Kernel, "Kernel output here");
+	terminal_print(cpu, Arch::Terminal::Type::Command, "aloooo");
 	memory_manager = new MemoryManager(UINT16_MAX);
 }
 
