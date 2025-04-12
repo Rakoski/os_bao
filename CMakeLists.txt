@@ -11,7 +11,6 @@ set(CMAKE_CXX_STANDARD 20)
 
 add_executable(
         os_bao2
-        main.cpp
         lib.cpp
         lib.h
         config.cpp
@@ -22,6 +21,8 @@ add_executable(
         os/process.cpp
         os/process.h
         os/os.h
+        os/memory_manager.cpp
+        os/memory_manager.h
         arch/arch.cpp
         arch/arch.h
         arch/computer.h
