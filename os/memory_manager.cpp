@@ -7,8 +7,8 @@
 namespace OS {
     MemoryManager* memory_manager = nullptr;
 
-    MemoryManager::MemoryManager(const uint16_t size) : next_free_addr(1000), PHYSICAL_MEMORY_SIZE(size) {
-
+    MemoryManager::MemoryManager(const uint16_t size) : next_free_addr(0), PHYSICAL_MEMORY_SIZE(size) {
+        next_free_addr = 512;
     }
 
     MemoryManager::~MemoryManager() = default;
@@ -22,9 +22,8 @@ namespace OS {
         process->set_limit(size_needed);
 
         next_free_addr += size_needed;
+
         return true;
-
-
     }
 
     void MemoryManager::free_memory(Process *process) {
