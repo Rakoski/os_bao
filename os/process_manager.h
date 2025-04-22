@@ -14,13 +14,10 @@ namespace OS {
     class ProcessManager {
     private:
         Arch::Cpu* cpu;
-        std::vector<std::unique_ptr<Process>> processes;
         Process* current_process = nullptr;
         uint16_t next_pid = 1;
 
         
-        std::unique_ptr<Process> idle_process = nullptr;
-
     public:
         explicit ProcessManager(Arch::Cpu* cpu);
         ~ProcessManager();

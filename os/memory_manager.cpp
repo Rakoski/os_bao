@@ -4,6 +4,8 @@
 
 #include "memory_manager.h"
 
+#include "os-lib.h"
+
 namespace OS {
     MemoryManager* memory_manager = nullptr;
 
@@ -19,16 +21,14 @@ namespace OS {
         }
 
         process->set_base(next_free_addr);
-        process->set_limit(size_needed);
+        process->set_limite(size_needed);
 
         next_free_addr += size_needed;
-
         return true;
     }
 
     void MemoryManager::free_memory(Process *process) {
         std::cout << "memoria foi freeada kk";
-        delete process;
         // TODO: fazer isso direito
     }
 

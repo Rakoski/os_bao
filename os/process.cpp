@@ -16,11 +16,8 @@ namespace OS {
     class ProcessManager {
     private:
         Arch::Cpu* cpu;
-        std::vector<std::unique_ptr<Process>> processes;
-        Process* current_process = nullptr;
-        uint16_t next_pid = 1;
-
-        std::unique_ptr<Process> idle_process = nullptr;
+        Process* processo_corente = nullptr;
+        uint16_t proximo_pid = 1;
 
     public:
         explicit ProcessManager(Arch::Cpu* cpu);
@@ -28,11 +25,12 @@ namespace OS {
 
         uint16_t create_process(const std::string& name, const std::vector<uint16_t>& code);
         bool kill_process(uint16_t pid);
-        Process* get_current_process();
 
         void load_idle_process();
 
-        void run_current_process();
+        void get_processo_corente();
+
+        void rodar_processo_corente();
 
         void schedule_next_process();
 
