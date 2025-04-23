@@ -2,7 +2,7 @@
 
 namespace OS {
     Process::Process(uint16_t pid, const std::string& name, const std::vector<uint16_t>& code)
-    : pid(pid), name(name), state_(ProcessState::ready), program_counter(0), base(0), limit(0), code(code) {
+    : pid(pid), name(name), state_(ProcessState::ready), pc(0), base(0), limite(0), code(code) {
         
         for (auto& reg : registrators) {
             reg = 0;

@@ -10,7 +10,8 @@ namespace OS {
     MemoryManager* memory_manager = nullptr;
 
     MemoryManager::MemoryManager(const uint16_t size) : next_free_addr(0), PHYSICAL_MEMORY_SIZE(size) {
-        next_free_addr = 512;
+        uint32_t PROXIMO_PAGE = 512;
+        next_free_addr = PROXIMO_PAGE;
     }
 
     MemoryManager::~MemoryManager() = default;
