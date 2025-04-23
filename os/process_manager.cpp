@@ -28,7 +28,7 @@ namespace OS {
     }
 
     void Process::save_context(Arch::Cpu* cpu) {
-        program_counter = cpu->get_pc();
+        pc = cpu->get_pc();
 
         for (uint16_t i = 0; i < Config::nregs; i++) {
             registrators[i] = cpu->get_gpr(i);
@@ -36,7 +36,7 @@ namespace OS {
     }
 
     void Process::restore_context(Arch::Cpu* cpu) const {
-        cpu->set_pc(program_counter);
+        cpu->set_pc(pc);
 
         for (uint16_t i = 0; i < Config::nregs; i++) {
             cpu->set_gpr(i, registrators[i]);
