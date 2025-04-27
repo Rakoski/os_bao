@@ -42,7 +42,7 @@ Process* create_process(const std::string& name, const std::vector<uint16_t>& co
     }
     
     
-    process->set_program_counter(0);
+    process->pc(0);
     
     return process;
 }
@@ -125,7 +125,7 @@ bool load_program(const std::string& filename) {
             cpuglobal->pmem_write(process->get_base() + i, code[i]);
         }
 
-        process->set_program_counter(0);
+        process->pc(0);
         for (uint16_t i = 0; i < Config::nregs; i++) {
             process->set_registrator(i, 0);
         }
@@ -139,7 +139,7 @@ bool load_program(const std::string& filename) {
         cpuglobal->set_pc(0);
 
         terminal_println(cpuglobal, Terminal::Kernel, "Process ", pid, " (", filename, ") loaded successfully");
-        terminal_println(cpuglobal, Terminal::Kernel, "Base: ", process->get_base(), ", Limit: ", process->get_limit());
+        terminal_println(cpuglobal, Terminal::Kernel, "Base: ", process->get_base(), ", Limit: ", process->get_limite());
 
         return true;
     } catch (const Mylib::Exception& e) {

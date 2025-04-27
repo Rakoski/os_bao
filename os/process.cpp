@@ -20,6 +20,7 @@ namespace OS {
         uint16_t proximo_pid = 1;
 
     public:
+        uint16_t pc;
         explicit ProcessManager(Arch::Cpu* cpu);
         ~ProcessManager();
 

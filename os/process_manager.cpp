@@ -45,6 +45,6 @@ namespace OS {
         
         cpu->set_vmem_mode(Arch::Cpu::VmemMode::BaseLimit);
         cpu->set_vmem_paddr_base(base);
-        cpu->set_vmem_size(limit);
+        cpu->set_vmem_size(limite);
     }
 }

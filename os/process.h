@@ -30,7 +30,7 @@ namespace OS {
     };
 
     class Process {
-        private:
+    public:
         uint16_t pid = 0;
         std::string name;
         ProcessState state_ = ProcessState::ready;
@@ -43,7 +43,6 @@ namespace OS {
 
         std::vector<uint16_t> code;
 
-    public:
 
             [[nodiscard]] uint16_t get_pid() const {
                 return pid;
