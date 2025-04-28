@@ -4,11 +4,14 @@
 
 #include "memory_manager.h"
 
+#include "os-lib.h"
+
 namespace OS {
     MemoryManager* memory_manager = nullptr;
 
-    MemoryManager::MemoryManager(const uint16_t size) : next_free_addr(1000), PHYSICAL_MEMORY_SIZE(size) {
-
+    MemoryManager::MemoryManager(const uint16_t size) : next_free_addr(0), PHYSICAL_MEMORY_SIZE(size) {
+        uint16_t PROXIMO_PAGE = 512;
+        next_free_addr = PROXIMO_PAGE;
     }
 
     MemoryManager::~MemoryManager() = default;
@@ -19,17 +22,14 @@ namespace OS {
         }
 
         process->set_base(next_free_addr);
-        process->set_limit(size_needed);
+        process->set_limite(size_needed);
 
         next_free_addr += size_needed;
         return true;
-
-
     }
 
     void MemoryManager::free_memory(Process *process) {
         std::cout << "memoria foi freeada kk";
-        delete process;
         // TODO: fazer isso direito
     }
 
