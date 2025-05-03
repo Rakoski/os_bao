@@ -4,7 +4,7 @@ namespace OS {
     Process::Process(uint16_t pid, const std::string& name, const std::vector<uint16_t>& code)
     : pid(pid), name(name), state_(ProcessState::ready), pc(0), base(0), limite(0), code(code) {
         
-        for (auto& reg : registrators) {
+        for (auto& reg : regs) {
             reg = 0;
         }
     }
@@ -13,17 +13,17 @@ namespace OS {
         
     }
 
-    uint16_t Process::get_registrator(const uint16_t number) const {
+    uint16_t Process::get_regs(const uint16_t number) const {
         if (number < Config::nregs) {
-            return registrators[number];
+            return regs[number];
         } else {
             return 0;
         }
     }
 
-    void Process::set_registrator(uint16_t number, uint16_t value) {
+    void Process::set_regs(uint16_t number, uint16_t value) {
         if (number < Config::nregs) {
-            registrators[number] = value;
+            regs[number] = value;
         }
     }
 
@@ -31,7 +31,7 @@ namespace OS {
         pc = cpu->get_pc();
 
         for (uint16_t i = 0; i < Config::nregs; i++) {
-            registrators[i] = cpu->get_gpr(i);
+            regs[i] = cpu->get_gpr(i);
         }
     }
 
@@ -39,7 +39,7 @@ namespace OS {
         cpu->set_pc(pc);
 
         for (uint16_t i = 0; i < Config::nregs; i++) {
-            cpu->set_gpr(i, registrators[i]);
+            cpu->set_gpr(i, regs[i]);
         }
 
         

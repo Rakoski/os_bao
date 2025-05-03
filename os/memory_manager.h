@@ -13,8 +13,8 @@ namespace OS {
 
     class MemoryManager {
     private:
-        uint16_t next_free_addr;
-        const uint16_t PHYSICAL_MEMORY_SIZE;
+        uint16_t prox_livre;
+        const uint16_t TAMANHO_LMAXIMO;
 
     public:
          explicit MemoryManager(uint16_t memory_size);

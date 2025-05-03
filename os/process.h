@@ -36,9 +36,11 @@ namespace OS {
         ProcessState state_ = ProcessState::ready;
 
         uint16_t pc;
-        std::array<uint16_t, Config::nregs> registrators;
+        std::array<uint16_t, Config::nregs> regs;
 
         uint16_t base = 0;
+
+        // pode ser tanto o tamanho quanto o final (eu fiz como tamanho)
         uint16_t limite = 0;
 
         std::vector<uint16_t> code;
@@ -124,12 +126,12 @@ namespace OS {
                 this->pc = program_counter;
             }
 
-            [[nodiscard]] std::array<uint16_t, Config::nregs> registrators1() const {
-                return registrators;
+            [[nodiscard]] std::array<uint16_t, Config::nregs> regs1() const {
+                return regs;
             }
 
-            void set_registrators(const std::array<uint16_t, Config::nregs> &registrators) {
-                this->registrators = registrators;
+            void set_regs(const std::array<uint16_t, Config::nregs> &regs) {
+                this->regs = regs;
             }
 
             [[nodiscard]] uint16_t base1() const {
@@ -165,9 +167,9 @@ namespace OS {
 
             ~Process();
 
-            uint16_t get_registrator(uint16_t number) const;
+            uint16_t get_regs(uint16_t number) const;
 
-            void set_registrator(uint16_t number, uint16_t value);
+            void set_regs(uint16_t number, uint16_t value);
     };
 }
 

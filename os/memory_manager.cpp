@@ -9,32 +9,38 @@
 namespace OS {
     MemoryManager* memory_manager = nullptr;
 
-    MemoryManager::MemoryManager(const uint16_t size) : next_free_addr(0), PHYSICAL_MEMORY_SIZE(size) {
+    MemoryManager::MemoryManager(const uint16_t size) : prox_livre(0), TAMANHO_LMAXIMO(size) {
         uint16_t PROXIMO_PAGE = 512;
-        next_free_addr = PROXIMO_PAGE;
+        prox_livre = PROXIMO_PAGE;
     }
 
     MemoryManager::~MemoryManager() = default;
 
-    bool MemoryManager::allocate_memory_for_process(Process *process, uint16_t size_needed) {
-        if (next_free_addr + size_needed > PHYSICAL_MEMORY_SIZE) {
+    bool MemoryManager::allocate_memory_for_process(Process *process, uint16_t precisode) {
+        if (prox_livre + precisode > TAMANHO_LMAXIMO) {
             return false;
         }
 
-        process->set_base(next_free_addr);
-        process->set_limite(size_needed);
+        process->set_base(prox_livre);
+        process->set_limite(precisode);
 
-        next_free_addr += size_needed;
+        prox_livre += precisode;
         return true;
     }
 
     void MemoryManager::free_memory(Process *process) {
         std::cout << "memoria foi freeada kk";
-        // TODO: fazer isso direito
+
+        uint16_t base = process->get_base();
+        uint16_t limite = process->get_limite();
+
+        if (base + limite == prox_livre) {
+            prox_livre = base;
+        }
     }
 
     uint16_t MemoryManager::get_free_memory() const {
-        return PHYSICAL_MEMORY_SIZE - next_free_addr;
+        return TAMANHO_LMAXIMO - prox_livre;
     }
 
 

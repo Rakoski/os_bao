@@ -38,4 +38,6 @@ add_executable(
         arch/terminal.h
         arch/timer.cpp
         arch/timer.h
+        os/utils.cpp
+        os/utils.h
 )
