@@ -1,11 +1,9 @@
-#include <stdexcept>
 #include <string>
-#include <string_view>
 #include <sstream>
 #include <vector>
 
 #include <cstdint>
-#include <cstdlib>
+#include <algorithm>
 
 #include "../config.h"
 #include "../lib.h"
@@ -15,6 +13,7 @@
 #include "memory_manager.h"
 #include "os-lib.h"
 #include "process.h"
+#include "utils.h"
 
 namespace OS {
 
@@ -23,6 +22,7 @@ Arch::Cpu *cpuglobal;
 std::string command_buffer;
 Process* proceso_corrente = nullptr;
 uint16_t next_pid = 1;
+std::vector<Process*> todos_processo;
 
 Process* create_process(const std::string& name, const std::vector<uint16_t>& code) {
     Process* process = new Process(next_pid++, name, code);
@@ -31,7 +31,7 @@ Process* create_process(const std::string& name, const std::vector<uint16_t>& co
     uint16_t size_needed = code.size() + 64; 
     
     if (!memory_manager->allocate_memory_for_process(process, size_needed)) {
-        terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "Error: Not enough memory to allocate process ", name);
+        terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "sem memória pra alocar o processo ", name);
         delete process;
         return nullptr;
     }
@@ -42,7 +42,7 @@ Process* create_process(const std::string& name, const std::vector<uint16_t>& co
     }
     
     
-    process->pc(0);
+    process->set_pc(0);
     
     return process;
 }
@@ -52,10 +52,10 @@ void kill_proceso_corrente() {
         terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "matando!!! hahahahaha: ", proceso_corrente->get_name());
         
         memory_manager->free_memory(proceso_corrente);
-        
-        delete proceso_corrente;
+
+        cpuglobal->set_pc(0);
         proceso_corrente = nullptr;
-        
+
         terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "matei!!!!! ");
     } else {
         terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "nenhum processo corrente");
@@ -77,22 +77,18 @@ void run_process(Process* process) {
     
     process->restore_context(cpuglobal);
     
-    terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "Process ", process->get_name(), " started");
+    terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "processo", process->get_name(), " comecou");
 }
 
 void kill_process() {
     if (!proceso_corrente) {
-        terminal_println(cpuglobal, Terminal::Kernel, "No process is currently running");
+        terminal_println(cpuglobal, Terminal::Kernel, "sem processos");
         return;
     }
 
-    terminal_println(cpuglobal, Terminal::Kernel, "Killing process ", proceso_corrente->get_pid(), " (", proceso_corrente->get_name(), ")");
+    terminal_println(cpuglobal, Terminal::Kernel, "MATANDO!! ", proceso_corrente->get_pid(), " (", proceso_corrente->get_name(), ")");
 
-    if (memory_manager) {
-        memory_manager->free_memory(proceso_corrente);
-    }
-
-    delete proceso_corrente;
+    memory_manager->free_memory(proceso_corrente);
     proceso_corrente = nullptr;
     cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Disabled);
     cpuglobal->set_pc(0);
@@ -114,10 +110,10 @@ bool load_program(const std::string& filename) {
 
         auto * process = new Process(pid, filename, code);
 
-        uint16_t size_needed = code.size();
-        if (!memory_manager->allocate_memory_for_process(process, size_needed)) {
-            terminal_println(cpuglobal, Terminal::Kernel, "Error: Not enough memory to load process");
-            delete process;
+        uint16_t tamanho_preciso = code.size() + 64; // espaço p stack e mais um pouco
+        if (!memory_manager->allocate_memory_for_process(process, tamanho_preciso)) {
+            terminal_println(cpuglobal, Terminal::Kernel, "sem memória pra esse nvo processo!");
+            memory_manager->free_memory(proceso_corrente);
             return false;
         }
 
@@ -125,21 +121,52 @@ bool load_program(const std::string& filename) {
             cpuglobal->pmem_write(process->get_base() + i, code[i]);
         }
 
-        process->pc(0);
-        for (uint16_t i = 0; i < Config::nregs; i++) {
-            process->set_registrator(i, 0);
-        }
+        process->set_pc(0);
+
+
+        Utils::setando_novos_regs_pro_processo(process);
 
         if (proceso_corrente) {
-            kill_process();
+            proceso_corrente->save_context(cpuglobal);
+            proceso_corrente->set_state(ProcessState::running);
+
+            auto it = std::find(todos_processo.begin(), todos_processo.end(), proceso_corrente);
+            if (it == todos_processo.end()) {
+                todos_processo.push_back(proceso_corrente);
+            }
+
+            proceso_corrente = nullptr;
+            for (auto* proc : todos_processo) {
+                if (proc->get_name() == "idle.bin") {
+                    proceso_corrente = proc;
+                    break;
+                }
+            }
+
+            if (!proceso_corrente && !todos_processo.empty()) {
+                proceso_corrente = todos_processo[0];
+            }
+
+            if (proceso_corrente) {
+                proceso_corrente->set_state(ProcessState::running);
+                proceso_corrente->do_mem_protection(cpuglobal);
+                proceso_corrente->restore_context(cpuglobal);
+                terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "rpocesso voltando: ", proceso_corrente->get_name());
+            } else {
+                cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Disabled);
+                cpuglobal->set_pc(0);
+                terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "matei!!!!!  (sem mais processos para executar)");
+            }
+        } else {
+            terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "nenhum processo corrente");
         }
 
         proceso_corrente = process;
         process->do_mem_protection(cpuglobal);
-        cpuglobal->set_pc(0);
+        todos_processo.push_back(process);
 
-        terminal_println(cpuglobal, Terminal::Kernel, "Process ", pid, " (", filename, ") loaded successfully");
-        terminal_println(cpuglobal, Terminal::Kernel, "Base: ", process->get_base(), ", Limit: ", process->get_limite());
+        terminal_println(cpuglobal, Terminal::Kernel, "processo ", pid, " (", filename, ") foi");
+        terminal_println(cpuglobal, Terminal::Kernel, "base: ", process->get_base(), ", limite: ", process->get_limite());
 
         return true;
     } catch (const Mylib::Exception& e) {
@@ -180,6 +207,7 @@ void process_command(const std::string& palavra) {
         shutdown();
         cpuglobal->turn_off();
     }
+
     else if (comando == "load") {
 
         if (args.size() < 2) {
@@ -189,14 +217,16 @@ void process_command(const std::string& palavra) {
 
             load_program(args[1]);
     }
+
     else if (comando == "kill") {
 
         if (proceso_corrente) {
             kill_proceso_corrente();
         } else {
-            terminal_println(cpuglobal, Arch::Terminal::Type::Command, "sem processos");
+            terminal_println(cpuglobal, Arch::Terminal::Type::Command, "\nsem processos");
         }
     }
+
     else if (comando == "help") {
 
         terminal_println(cpuglobal, Arch::Terminal::Type::Command, "\nCOmandos:");
@@ -205,6 +235,7 @@ void process_command(const std::string& palavra) {
         terminal_println(cpuglobal, Arch::Terminal::Type::Command, "  exit - Sair the simulator");
         terminal_println(cpuglobal, Arch::Terminal::Type::Command, "  help - mostra esse menu né sonso");
     }
+
     else {
         terminal_println(cpuglobal, Arch::Terminal::Type::Command, "não conheçi esse comando: ", comando);
         terminal_println(cpuglobal, Arch::Terminal::Type::Command, "digite help pra ver os comandos");
@@ -219,6 +250,8 @@ void boot(Arch::Cpu *cpu)
 
     memory_manager = new MemoryManager(Config::phys_mem_size_words);
 
+    load_program("idle.bin");
+
     terminal_println(cpu, Arch::Terminal::Type::Command, "Type commands here.");
     terminal_println(cpu, Arch::Terminal::Type::App, "Apps output here");
     terminal_println(cpu, Arch::Terminal::Type::Kernel, "Kernel output here");
@@ -230,8 +263,8 @@ void boot(Arch::Cpu *cpu)
 
 void interrupt(const Arch::InterruptCode interrupt)
 {
-	if (interrupt == Arch::InterruptCode::Keyboard) {
-		uint16_t io = cpuglobal->read_io(Arch::IO_Port::TerminalReadTypedChar);
+	if (interrupt == InterruptCode::Keyboard) {
+		uint16_t io = cpuglobal->read_io(IO_Port::TerminalReadTypedChar);
 	    char letra = (char) io;
 
 	        if (letra == '\n' || letra == '\r') {
@@ -261,55 +294,77 @@ void interrupt(const Arch::InterruptCode interrupt)
 
 }
 
-void syscall ()
-{
+void syscall () {
     if (!proceso_corrente) {
         terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "nenhum processo rodando");
         return;
     }
     
     
-    uint16_t syscall_code = cpuglobal->get_gpr(0);
+    uint16_t cod_syscall = cpuglobal->get_gpr(0);
     
-    switch (syscall_code) {
-        case 0: 
+    switch (cod_syscall) {
+        case 0: {
             terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "=( o processo pediu pra sair ----> tadinho <---");
-            kill_proceso_corrente();
-            break;
-            
-        case 1: 
-            {
-                uint16_t str_addr = cpuglobal->get_gpr(1);
-                std::string output;
-                char caracterekk;
-                
-                while ((caracterekk = static_cast<char>(cpuglobal->vmem_read(str_addr++))) != '\0') {
-                    output += caracterekk;
-                }
-                
-                
-                terminal_print(cpuglobal, Arch::Terminal::Type::App, output);
-            }
-            break;
-            
-        case 2: 
-            terminal_print(cpuglobal, Arch::Terminal::Type::App, "\n");
-            break;
-            
-        case 3: 
-            {
+            std::string process_name = proceso_corrente->get_name();
 
-                uint16_t value = cpuglobal->get_gpr(1);
-                terminal_print(cpuglobal, Arch::Terminal::Type::App, value);
+            auto processo_dea_agora = std::find(todos_processo.begin(), todos_processo.end(), proceso_corrente);
+            if (processo_dea_agora != todos_processo.end()) {
+                todos_processo.erase(processo_dea_agora);
+            }
+
+            memory_manager->free_memory(proceso_corrente);
+            proceso_corrente = nullptr;
+            Process* processo_do_idlebin = nullptr;
+
+            for (auto* processo : todos_processo) {
+                if (processo->get_name() == "idle.bin") processo_do_idlebin = processo;
+            }
+
+            if (processo_do_idlebin) {
+                proceso_corrente = processo_do_idlebin;
+                proceso_corrente->set_state(ProcessState::running);
+                proceso_corrente->do_mem_protection(cpuglobal);
+                proceso_corrente = todos_processo[0];
+                proceso_corrente->restore_context(cpuglobal);
+                terminal_println(cpuglobal, Terminal::Kernel, "voltndo pro idle");
+                terminal_println(cpuglobal, Terminal::Kernel, "base idle: ", proceso_corrente->get_base(), " limite idle: ", proceso_corrente->get_limite());
             }
             break;
-            
+        }
+
+        case 1:
+        {
+            uint16_t str_addr = cpuglobal->get_gpr(1);
+            std::string output;
+            char caracterekk;
+
+            while ((caracterekk = static_cast<char>(cpuglobal->vmem_read(str_addr++))) != '\0') {
+                output += caracterekk;
+            }
+
+
+            terminal_print(cpuglobal, Arch::Terminal::Type::App, output);
+        }
+        break;
+
+        case 2:
+            terminal_print(cpuglobal, Arch::Terminal::Type::App, "\n");
+        break;
+
+        case 3:
+        {
+
+            uint16_t value = cpuglobal->get_gpr(1);
+            terminal_print(cpuglobal, Arch::Terminal::Type::App, value);
+        }
+        break;
+
         default:
-            terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "kakakka q porra de cod syscall é esse vei: ", syscall_code);
-            break;
+            terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "kakakka q porra de cod syscall é esse vei: ", cod_syscall);
+        break;
     }
 }
-
 
 
 void shutdown() {

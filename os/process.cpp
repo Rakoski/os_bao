@@ -4,10 +4,8 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include <optional>
 #include <memory>
 
-#include "../config.h"
 #include "../arch/arch.h"
 #include "process.h"
 
