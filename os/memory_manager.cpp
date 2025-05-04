@@ -34,6 +34,8 @@ namespace OS {
         uint16_t base = process->get_base();
         uint16_t limite = process->get_limite();
 
+        // o fim do endereço do processo é igual ao próximo endereço livre?
+        // se for, é o processo alocado q eu quero -> posso pegar essa memória de volta
         if (base + limite == prox_livre) {
             prox_livre = base;
         }
