@@ -150,7 +150,9 @@ namespace OS {
                 this->codigo_processo = codigo_processo;
             }
 
-            void do_mem_protection(Arch::Cpu* cpu) const {
+            void protege(Arch::Cpu* cpu) const {
+
+                // n deixa acessar o end de cada um
                 cpu->set_vmem_mode(Arch::Cpu::BaseLimit);
                 cpu->set_vmem_paddr_base(base);
                 cpu->set_vmem_size(limite);

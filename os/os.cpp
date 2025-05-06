@@ -71,7 +71,7 @@ void kill_proceso_corrente() {
         if (processo_do_idlebin) {
             proceso_corrente = processo_do_idlebin;
             proceso_corrente->set_estado(ProcessState::running);
-            proceso_corrente->do_mem_protection(cpuglobal);
+            proceso_corrente->protege(cpuglobal);
             proceso_corrente->restore_context(cpuglobal);
             terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "rpocesso voltando: ", proceso_corrente->get_name());
         } else {
@@ -94,7 +94,7 @@ void run_process(Process* process) {
     
     
     proceso_corrente = process;
-    process->do_mem_protection(cpuglobal);
+    process->protege(cpuglobal);
     process->restore_context(cpuglobal);
     
     terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "processo", process->get_name(), " comecou");
@@ -131,7 +131,7 @@ bool load_program(const std::string& filename) {
 
         Process* process = new Process(pid, filename, tamanho);
 
-        uint16_t tamanho_preciso = tamanho.size(); // espaço p stack e mais um pouco
+        uint16_t tamanho_preciso = tamanho.size();
         if (!memory_manager->allocate_memory_for_process(process, tamanho_preciso)) {
             terminal_println(cpuglobal, Terminal::Kernel, "sem memória pra esse nvo processo!");
             memory_manager->free_memory(proceso_corrente);
@@ -148,6 +148,7 @@ bool load_program(const std::string& filename) {
         Utils::setando_novos_regs_pro_processo(process);
 
         if (proceso_corrente) {
+            // coloca os gpr
             proceso_corrente->save_context(cpuglobal);
             proceso_corrente->set_estado(ProcessState::running);
 
@@ -170,7 +171,7 @@ bool load_program(const std::string& filename) {
             //setando pra voltar pro idle
             if (proceso_corrente) {
                 proceso_corrente->set_estado(ProcessState::running);
-                proceso_corrente->do_mem_protection(cpuglobal);
+                proceso_corrente->protege(cpuglobal);
                 proceso_corrente->restore_context(cpuglobal);
                 terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "rpocesso voltando: ", proceso_corrente->get_name());
             } else {
@@ -183,7 +184,7 @@ bool load_program(const std::string& filename) {
         }
 
         proceso_corrente = process;
-        process->do_mem_protection(cpuglobal);
+        process->protege(cpuglobal);
         todos_processo.push_back(process);
 
         terminal_println(cpuglobal, Terminal::Kernel, "processo ", pid, " (", filename, ") foi");
@@ -345,7 +346,7 @@ void syscall () {
             if (processo_do_idlebin) {
                 proceso_corrente = processo_do_idlebin;
                 proceso_corrente->set_estado(ProcessState::running);
-                proceso_corrente->do_mem_protection(cpuglobal);
+                proceso_corrente->protege(cpuglobal);
                 proceso_corrente = todos_processo[0];
                 proceso_corrente->restore_context(cpuglobal);
                 terminal_println(cpuglobal, Terminal::Kernel, "voltndo pro idle");
