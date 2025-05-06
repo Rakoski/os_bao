@@ -4,7 +4,7 @@ namespace OS {
     Process::Process(uint16_t pid, const std::string& name, const std::vector<uint16_t>& codigo_proceso)
     : pid(pid), name(name), estado(ProcessState::ready), pc(0), base(0), limite(0), codigo_processo(codigo_proceso) {
         
-        for (auto& reg : regs) {
+        for (uint16_t& reg : regs) {
             reg = 0;
         }
     }

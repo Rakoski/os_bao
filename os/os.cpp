@@ -164,9 +164,7 @@ bool load_program(const std::string& filename) {
                 }
             }
 
-            if (!proceso_corrente && !todos_processo.empty()) {
-                proceso_corrente = todos_processo[0];
-            }
+            proceso_corrente = todos_processo[0];
 
             //setando pra voltar pro idle
             if (proceso_corrente) {
