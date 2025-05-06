@@ -14,35 +14,42 @@ namespace OS {
     class ProcessManager {
     private:
         Arch::Cpu* cpu;
-        Process* processo_corente = nullptr;
-        uint16_t proximo_pid = 1;
+        Process* current_process = nullptr;
+        uint16_t next_pid = 1;
 
+        
     public:
-        uint16_t pc;
         explicit ProcessManager(Arch::Cpu* cpu);
         ~ProcessManager();
 
+        
         uint16_t create_process(const std::string& name, const std::vector<uint16_t>& code);
         bool kill_process(uint16_t pid);
+        Process* get_current_process();
 
+        
         void load_idle_process();
 
-        void get_processo_corente();
+        
+        void run_current_process();
 
-        void rodar_processo_corente();
-
+        
         void schedule_next_process();
 
+        
         bool load_program(const std::string& filename);
         void list_processes();
 
+        
         void handle_exception(const Arch::Cpu::CpuException& exception);
 
+        
         void handle_syscall();
     };
 
+    
     extern ProcessManager* process_manager;
 
-}
+} 
 
-#endif // __SO_BAO_HEADER_PROCESS_MANAGER_H__
+#endif 

@@ -18,7 +18,7 @@ static uint32_t get_file_size_bytes (const std::string_view fname)
 	file.open(fname.data(), std::ios::binary | std::ios::in);
 
 	if (!file.is_open())
-		throw Mylib::Exception(Mylib::build_str_from_stream("cannot load file ", fname));
+		throw Mylib::Exception(Mylib::build_str_from_stream("cannot load file ", fname.data()));
 
 	file.seekg(0, std::ios::end);
 	const auto bsize = file.tellg();

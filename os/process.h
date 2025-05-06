@@ -30,20 +30,21 @@ namespace OS {
     };
 
     class Process {
-        private:
-            uint16_t pid = 0;
-            std::string name;
-            ProcessState state_ = ProcessState::ready;
+    public:
+        uint16_t pid = 0;
+        std::string name;
+        ProcessState state_ = ProcessState::ready;
 
-        uint16_t program_counter;
-        std::array<uint16_t, Config::nregs> registrators;
+        uint16_t pc;
+        std::array<uint16_t, Config::nregs> regs;
 
-            uint16_t base = 0;
-            uint16_t limit = 0;
+        uint16_t base = 0;
+
+        // pode ser tanto o tamanho quanto o final (eu fiz como tamanho)
+        uint16_t limite = 0;
 
         std::vector<uint16_t> code;
 
-    public:
 
             [[nodiscard]] uint16_t get_pid() const {
                 return pid;
@@ -57,8 +58,8 @@ namespace OS {
                 return base;
             }
 
-            [[nodiscard]] uint16_t get_limit() const {
-                return limit;
+            [[nodiscard]] uint16_t get_limite() const {
+                return limite;
             }
 
             void set_pid(uint16_t pid) {
@@ -73,8 +74,8 @@ namespace OS {
                 this->base = base;
             }
 
-            void set_limit(uint16_t limit) {
-                this->limit = limit;
+            void set_limite(uint16_t limit) {
+                this->limite = limit;
             }
 
             [[nodiscard]] uint16_t pid1() const {
@@ -118,19 +119,19 @@ namespace OS {
             }
 
             [[nodiscard]] uint16_t program_counter1() const {
-                return program_counter;
+                return pc;
             }
 
-            void set_program_counter(uint16_t program_counter) {
-                this->program_counter = program_counter;
+            void set_pc(uint16_t program_counter) {
+                this->pc = program_counter;
             }
 
-            [[nodiscard]] std::array<uint16_t, Config::nregs> registrators1() const {
-                return registrators;
+            [[nodiscard]] std::array<uint16_t, Config::nregs> regs1() const {
+                return regs;
             }
 
-            void set_registrators(const std::array<uint16_t, Config::nregs> &registrators) {
-                this->registrators = registrators;
+            void set_regs(const std::array<uint16_t, Config::nregs> &regs) {
+                this->regs = regs;
             }
 
             [[nodiscard]] uint16_t base1() const {
@@ -139,14 +140,6 @@ namespace OS {
 
             void set_base1(uint16_t base) {
                 this->base = base;
-            }
-
-            [[nodiscard]] uint16_t limit1() const {
-                return limit;
-            }
-
-            void set_limit1(uint16_t limit) {
-                this->limit = limit;
             }
 
             [[nodiscard]] std::vector<uint16_t> code2() const {
@@ -160,7 +153,7 @@ namespace OS {
             void do_mem_protection(Arch::Cpu* cpu) const {
                 cpu->set_vmem_mode(Arch::Cpu::BaseLimit);
                 cpu->set_vmem_paddr_base(base);
-                cpu->set_vmem_size(limit);
+                cpu->set_vmem_size(limite);
             }
 
         //context swtiching
@@ -174,9 +167,9 @@ namespace OS {
 
             ~Process();
 
-            uint16_t get_registrator(uint16_t number) const;
+            uint16_t get_regs(uint16_t number) const;
 
-            void set_registrator(uint16_t number, uint16_t value);
+            void set_regs(uint16_t number, uint16_t value);
     };
 }
 
