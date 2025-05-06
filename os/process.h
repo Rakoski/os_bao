@@ -33,7 +33,7 @@ namespace OS {
     public:
         uint16_t pid = 0;
         std::string name;
-        ProcessState state_ = ProcessState::ready;
+        ProcessState estado = ProcessState::ready;
 
         uint16_t pc;
         std::array<uint16_t, Config::nregs> regs;
@@ -111,11 +111,11 @@ namespace OS {
             }
 
             [[nodiscard]] ProcessState state() const {
-                return state_;
+                return estado;
             }
 
-            void set_state(ProcessState state) {
-                state_ = state;
+            void set_estado(ProcessState state) {
+                estado = state;
             }
 
             [[nodiscard]] uint16_t program_counter1() const {

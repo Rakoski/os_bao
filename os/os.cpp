@@ -61,7 +61,7 @@ void kill_proceso_corrente() {
         proceso_corrente = nullptr;
 
         Process* processo_do_idlebin = nullptr;
-        for (auto* processo : todos_processo) {
+        for (Process* processo : todos_processo) {
             if (processo->get_name() == "idle.bin") {
                 processo_do_idlebin = processo;
                 break;
@@ -70,12 +70,12 @@ void kill_proceso_corrente() {
 
         if (processo_do_idlebin) {
             proceso_corrente = processo_do_idlebin;
-            proceso_corrente->set_state(ProcessState::running);
+            proceso_corrente->set_estado(ProcessState::running);
             proceso_corrente->do_mem_protection(cpuglobal);
             proceso_corrente->restore_context(cpuglobal);
             terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "rpocesso voltando: ", proceso_corrente->get_name());
         } else {
-            cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Disabled);
+            cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::BaseLimit);
             cpuglobal->set_pc(0);
             terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "matei!!!!!  (sem mais processos)");
         }
@@ -94,11 +94,7 @@ void run_process(Process* process) {
     
     
     proceso_corrente = process;
-    
-    
     process->do_mem_protection(cpuglobal);
-    
-    
     process->restore_context(cpuglobal);
     
     terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "processo", process->get_name(), " comecou");
@@ -114,7 +110,7 @@ void kill_process() {
 
     memory_manager->free_memory(proceso_corrente);
     proceso_corrente = nullptr;
-    cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Disabled);
+    cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::BaseLimit);
     cpuglobal->set_pc(0);
 }
 
@@ -126,15 +122,15 @@ bool load_program(const std::string& filename) {
     try {
         terminal_println(cpuglobal, Arch::Terminal::Type::App, "rodandouu");
         terminal_println(cpuglobal, Arch::Terminal::Type::App, filename.data());
-        std::vector<uint16_t> code = Lib::load_from_disk_to_16bit_buffer(filename);
+        std::vector<uint16_t> tamanho = Lib::load_from_disk_to_16bit_buffer(filename);
         terminal_println(cpuglobal, Arch::Terminal::Type::App, "rodandouu 2");
 
         static uint16_t next_pid = 1;
         uint16_t pid = next_pid++;
 
-        auto * process = new Process(pid, filename, code);
+        auto * process = new Process(pid, filename, tamanho);
 
-        uint16_t tamanho_preciso = code.size() + 64; // espaço p stack e mais um pouco
+        uint16_t tamanho_preciso = tamanho.size(); // espaço p stack e mais um pouco
         if (!memory_manager->allocate_memory_for_process(process, tamanho_preciso)) {
             terminal_println(cpuglobal, Terminal::Kernel, "sem memória pra esse nvo processo!");
             memory_manager->free_memory(proceso_corrente);
@@ -142,8 +138,8 @@ bool load_program(const std::string& filename) {
         }
 
         // logo quando carrego o processo preciso colocar ele na memória física, mas só agr
-        for (uint16_t i = 0; i < code.size(); i++) {
-            cpuglobal->pmem_write(process->get_base() + i, code[i]);
+        for (uint16_t i = 0; i < tamanho.size(); i++) {
+            cpuglobal->pmem_write(process->get_base() + i, tamanho[i]);
         }
 
         process->set_pc(0);
@@ -153,7 +149,7 @@ bool load_program(const std::string& filename) {
 
         if (proceso_corrente) {
             proceso_corrente->save_context(cpuglobal);
-            proceso_corrente->set_state(ProcessState::running);
+            proceso_corrente->set_estado(ProcessState::running);
 
             std::vector<Process*>::iterator processo_gambi = std::find(todos_processo.begin(), todos_processo.end(), proceso_corrente);
             if (processo_gambi == todos_processo.end()) {
@@ -174,12 +170,12 @@ bool load_program(const std::string& filename) {
 
             //setando pra voltar pro idle
             if (proceso_corrente) {
-                proceso_corrente->set_state(ProcessState::running);
+                proceso_corrente->set_estado(ProcessState::running);
                 proceso_corrente->do_mem_protection(cpuglobal);
                 proceso_corrente->restore_context(cpuglobal);
                 terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "rpocesso voltando: ", proceso_corrente->get_name());
             } else {
-                cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Disabled);
+                cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::BaseLimit);
                 cpuglobal->set_pc(0);
                 terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "matei!!!!!  (sem mais processos para executar)");
             }
@@ -349,7 +345,7 @@ void syscall () {
 
             if (processo_do_idlebin) {
                 proceso_corrente = processo_do_idlebin;
-                proceso_corrente->set_state(ProcessState::running);
+                proceso_corrente->set_estado(ProcessState::running);
                 proceso_corrente->do_mem_protection(cpuglobal);
                 proceso_corrente = todos_processo[0];
                 proceso_corrente->restore_context(cpuglobal);
