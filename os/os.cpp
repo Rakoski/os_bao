@@ -50,11 +50,35 @@ Process* create_process(const std::string& name, const std::vector<uint16_t>& co
 void kill_proceso_corrente() {
     if (proceso_corrente) {
         terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "matando!!! hahahahaha: ", proceso_corrente->get_name());
-        
-        memory_manager->free_memory(proceso_corrente);
 
-        cpuglobal->set_pc(0);
+        auto it = std::find(todos_processo.begin(), todos_processo.end(), proceso_corrente);
+        if (it != todos_processo.end()) {
+            todos_processo.erase(it);
+        }
+
+        memory_manager->free_memory(proceso_corrente);
+        delete proceso_corrente;
         proceso_corrente = nullptr;
+
+        Process* processo_do_idlebin = nullptr;
+        for (auto* processo : todos_processo) {
+            if (processo->get_name() == "idle.bin") {
+                processo_do_idlebin = processo;
+                break;
+            }
+        }
+
+        if (processo_do_idlebin) {
+            proceso_corrente = processo_do_idlebin;
+            proceso_corrente->set_state(ProcessState::running);
+            proceso_corrente->do_mem_protection(cpuglobal);
+            proceso_corrente->restore_context(cpuglobal);
+            terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "rpocesso voltando: ", proceso_corrente->get_name());
+        } else {
+            cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Disabled);
+            cpuglobal->set_pc(0);
+            terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "matei!!!!!  (sem mais processos)");
+        }
 
         terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "matei!!!!! ");
     } else {
@@ -170,7 +194,7 @@ bool load_program(const std::string& filename) {
 
         return true;
     } catch (const Mylib::Exception& e) {
-        terminal_println(cpuglobal, Terminal::Kernel, e.what());
+        terminal_println(cpuglobal, Terminal::Kernel, "excao brabissima!!!! tratar: ", e.what());
         return false;
     }
 }
