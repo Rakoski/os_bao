@@ -115,6 +115,7 @@ void kill_process() {
 }
 
 bool load_program(const std::string& filename) {
+    // pra dps do idle carregar usar o mesmo ne
     if (!memory_manager) {
         memory_manager = new MemoryManager(Config::phys_mem_size_words);
     }
@@ -128,7 +129,7 @@ bool load_program(const std::string& filename) {
         static uint16_t next_pid = 1;
         uint16_t pid = next_pid++;
 
-        auto * process = new Process(pid, filename, tamanho);
+        Process* process = new Process(pid, filename, tamanho);
 
         uint16_t tamanho_preciso = tamanho.size(); // espaço p stack e mais um pouco
         if (!memory_manager->allocate_memory_for_process(process, tamanho_preciso)) {
@@ -143,7 +144,6 @@ bool load_program(const std::string& filename) {
         }
 
         process->set_pc(0);
-
 
         Utils::setando_novos_regs_pro_processo(process);
 
