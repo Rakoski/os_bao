@@ -61,7 +61,7 @@ void kill_proceso_corrente() {
         proceso_corrente = nullptr;
 
         Process* processo_do_idlebin = nullptr;
-        for (auto* processo : todos_processo) {
+        for (Process* processo : todos_processo) {
             if (processo->get_name() == "idle.bin") {
                 processo_do_idlebin = processo;
                 break;
@@ -70,12 +70,12 @@ void kill_proceso_corrente() {
 
         if (processo_do_idlebin) {
             proceso_corrente = processo_do_idlebin;
-            proceso_corrente->set_state(ProcessState::running);
-            proceso_corrente->do_mem_protection(cpuglobal);
+            proceso_corrente->set_estado(ProcessState::running);
+            proceso_corrente->protege(cpuglobal);
             proceso_corrente->restore_context(cpuglobal);
             terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "rpocesso voltando: ", proceso_corrente->get_name());
         } else {
-            cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Disabled);
+            cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::BaseLimit);
             cpuglobal->set_pc(0);
             terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "matei!!!!!  (sem mais processos)");
         }
@@ -94,11 +94,7 @@ void run_process(Process* process) {
     
     
     proceso_corrente = process;
-    
-    
-    process->do_mem_protection(cpuglobal);
-    
-    
+    process->protege(cpuglobal);
     process->restore_context(cpuglobal);
     
     terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "processo", process->get_name(), " comecou");
@@ -114,11 +110,12 @@ void kill_process() {
 
     memory_manager->free_memory(proceso_corrente);
     proceso_corrente = nullptr;
-    cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Disabled);
+    cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::BaseLimit);
     cpuglobal->set_pc(0);
 }
 
 bool load_program(const std::string& filename) {
+    // pra dps do idle carregar usar o mesmo ne
     if (!memory_manager) {
         memory_manager = new MemoryManager(Config::phys_mem_size_words);
     }
@@ -126,58 +123,59 @@ bool load_program(const std::string& filename) {
     try {
         terminal_println(cpuglobal, Arch::Terminal::Type::App, "rodandouu");
         terminal_println(cpuglobal, Arch::Terminal::Type::App, filename.data());
-        std::vector<uint16_t> code = Lib::load_from_disk_to_16bit_buffer(filename);
+        std::vector<uint16_t> tamanho = Lib::load_from_disk_to_16bit_buffer(filename);
         terminal_println(cpuglobal, Arch::Terminal::Type::App, "rodandouu 2");
 
         static uint16_t next_pid = 1;
         uint16_t pid = next_pid++;
 
-        auto * process = new Process(pid, filename, code);
+        Process* process = new Process(pid, filename, tamanho);
 
-        uint16_t tamanho_preciso = code.size() + 64; // espaço p stack e mais um pouco
+        uint16_t tamanho_preciso = tamanho.size();
         if (!memory_manager->allocate_memory_for_process(process, tamanho_preciso)) {
             terminal_println(cpuglobal, Terminal::Kernel, "sem memória pra esse nvo processo!");
             memory_manager->free_memory(proceso_corrente);
             return false;
         }
 
-        for (uint16_t i = 0; i < code.size(); i++) {
-            cpuglobal->pmem_write(process->get_base() + i, code[i]);
+        // logo quando carrego o processo preciso colocar ele na memória física, mas só agr
+        for (uint16_t i = 0; i < tamanho.size(); i++) {
+            cpuglobal->pmem_write(process->get_base() + i, tamanho[i]);
         }
 
         process->set_pc(0);
 
-
         Utils::setando_novos_regs_pro_processo(process);
 
         if (proceso_corrente) {
+            // coloca os gpr
             proceso_corrente->save_context(cpuglobal);
-            proceso_corrente->set_state(ProcessState::running);
+            proceso_corrente->set_estado(ProcessState::running);
 
-            auto it = std::find(todos_processo.begin(), todos_processo.end(), proceso_corrente);
-            if (it == todos_processo.end()) {
+            // seta novo processo
+            std::vector<Process*>::iterator processo_gambi = std::find(todos_processo.begin(), todos_processo.end(), proceso_corrente);
+            if (processo_gambi == todos_processo.end()) {
                 todos_processo.push_back(proceso_corrente);
             }
 
             proceso_corrente = nullptr;
-            for (auto* proc : todos_processo) {
+            for (Process* proc : todos_processo) {
                 if (proc->get_name() == "idle.bin") {
                     proceso_corrente = proc;
                     break;
                 }
             }
 
-            if (!proceso_corrente && !todos_processo.empty()) {
-                proceso_corrente = todos_processo[0];
-            }
+            proceso_corrente = todos_processo[0];
 
+            //setando pra voltar pro idle
             if (proceso_corrente) {
-                proceso_corrente->set_state(ProcessState::running);
-                proceso_corrente->do_mem_protection(cpuglobal);
+                proceso_corrente->set_estado(ProcessState::running);
+                proceso_corrente->protege(cpuglobal);
                 proceso_corrente->restore_context(cpuglobal);
                 terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "rpocesso voltando: ", proceso_corrente->get_name());
             } else {
-                cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Disabled);
+                cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::BaseLimit);
                 cpuglobal->set_pc(0);
                 terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "matei!!!!!  (sem mais processos para executar)");
             }
@@ -186,7 +184,7 @@ bool load_program(const std::string& filename) {
         }
 
         proceso_corrente = process;
-        process->do_mem_protection(cpuglobal);
+        process->protege(cpuglobal);
         todos_processo.push_back(process);
 
         terminal_println(cpuglobal, Terminal::Kernel, "processo ", pid, " (", filename, ") foi");
@@ -254,14 +252,14 @@ void process_command(const std::string& palavra) {
     else if (comando == "help") {
 
         terminal_println(cpuglobal, Arch::Terminal::Type::Command, "\nCOmandos:");
-        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "  load - carregar em arquivo, ");
+        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "  load - carregar um arquivo / processo ");
         terminal_println(cpuglobal, Arch::Terminal::Type::Command, "  kill - mata o programa rodando");
         terminal_println(cpuglobal, Arch::Terminal::Type::Command, "  exit - Sair the simulator");
-        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "  help - mostra esse menu né sonso");
+        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "  help - mostra esse menu");
     }
 
     else {
-        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "não conheçi esse comando: ", comando);
+        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "\nnao conheco esse comando: ", comando);
         terminal_println(cpuglobal, Arch::Terminal::Type::Command, "digite help pra ver os comandos");
     }
     terminal_print(cpuglobal, Arch::Terminal::Type::Command, "\n");
@@ -324,7 +322,7 @@ void syscall () {
         return;
     }
     
-    
+    // pega gpr (general purpose register)
     uint16_t cod_syscall = cpuglobal->get_gpr(0);
     
     switch (cod_syscall) {
@@ -347,8 +345,8 @@ void syscall () {
 
             if (processo_do_idlebin) {
                 proceso_corrente = processo_do_idlebin;
-                proceso_corrente->set_state(ProcessState::running);
-                proceso_corrente->do_mem_protection(cpuglobal);
+                proceso_corrente->set_estado(ProcessState::running);
+                proceso_corrente->protege(cpuglobal);
                 proceso_corrente = todos_processo[0];
                 proceso_corrente->restore_context(cpuglobal);
                 terminal_println(cpuglobal, Terminal::Kernel, "voltndo pro idle");
@@ -363,7 +361,7 @@ void syscall () {
             std::string output;
             char caracterekk;
 
-            while ((caracterekk = static_cast<char>(cpuglobal->vmem_read(str_addr++))) != '\0') {
+            while ((caracterekk = (char) (cpuglobal->vmem_read(str_addr++))) != '\0') {
                 output += caracterekk;
             }
 
@@ -379,6 +377,7 @@ void syscall () {
         case 3:
         {
 
+            //registrador 1
             uint16_t value = cpuglobal->get_gpr(1);
             terminal_print(cpuglobal, Arch::Terminal::Type::App, value);
         }

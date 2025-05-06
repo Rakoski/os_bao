@@ -9,8 +9,8 @@
 namespace OS {
     MemoryManager* memory_manager = nullptr;
 
-    MemoryManager::MemoryManager(const uint16_t size) : prox_livre(0), TAMANHO_LMAXIMO(size) {
-        uint16_t PROXIMO_PAGE = 512;
+    MemoryManager::MemoryManager(const uint16_t tamanho) : prox_livre(0), TAMANHO_LMAXIMO(tamanho) {
+        uint16_t PROXIMO_PAGE = 4096;
         prox_livre = PROXIMO_PAGE;
     }
 

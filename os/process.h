@@ -33,7 +33,7 @@ namespace OS {
     public:
         uint16_t pid = 0;
         std::string name;
-        ProcessState state_ = ProcessState::ready;
+        ProcessState estado = ProcessState::ready;
 
         uint16_t pc;
         std::array<uint16_t, Config::nregs> regs;
@@ -43,7 +43,7 @@ namespace OS {
         // pode ser tanto o tamanho quanto o final (eu fiz como tamanho)
         uint16_t limite = 0;
 
-        std::vector<uint16_t> code;
+        std::vector<uint16_t> codigo_processo;
 
 
             [[nodiscard]] uint16_t get_pid() const {
@@ -86,12 +86,12 @@ namespace OS {
                 this->pid = pid;
             }
 
-            [[nodiscard]] std::vector<uint16_t> code1() const {
-                return code;
+            [[nodiscard]] std::vector<uint16_t> codigo_processo1() const {
+                return codigo_processo;
             }
 
-            void set_code(const std::vector<uint16_t> &code) {
-                this->code = code;
+            void set_codigo_processo(const std::vector<uint16_t> &codigo_processo) {
+                this->codigo_processo = codigo_processo;
             }
 
             [[nodiscard]] uint16_t pid2() const {
@@ -111,11 +111,11 @@ namespace OS {
             }
 
             [[nodiscard]] ProcessState state() const {
-                return state_;
+                return estado;
             }
 
-            void set_state(ProcessState state) {
-                state_ = state;
+            void set_estado(ProcessState state) {
+                estado = state;
             }
 
             [[nodiscard]] uint16_t program_counter1() const {
@@ -142,15 +142,17 @@ namespace OS {
                 this->base = base;
             }
 
-            [[nodiscard]] std::vector<uint16_t> code2() const {
-                return code;
+            [[nodiscard]] std::vector<uint16_t> codigo_processo2() const {
+                return codigo_processo;
             }
 
-            void set_code1(const std::vector<uint16_t> &code) {
-                this->code = code;
+            void set_codigo_processo1(const std::vector<uint16_t> &codigo_processo) {
+                this->codigo_processo = codigo_processo;
             }
 
-            void do_mem_protection(Arch::Cpu* cpu) const {
+            void protege(Arch::Cpu* cpu) const {
+
+                // n deixa acessar o end de cada um
                 cpu->set_vmem_mode(Arch::Cpu::BaseLimit);
                 cpu->set_vmem_paddr_base(base);
                 cpu->set_vmem_size(limite);
@@ -163,7 +165,7 @@ namespace OS {
 
             void restore_context(Arch::Cpu* cpu) const;
 
-            Process(uint16_t pid, const std::string &name, const std::vector<uint16_t> &code);
+            Process(uint16_t pid, const std::string &name, const std::vector<uint16_t> &codigo_processo);
 
             ~Process();
 

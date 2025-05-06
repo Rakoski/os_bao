@@ -12,13 +12,7 @@
 namespace OS {
 
     class ProcessManager {
-    private:
-        Arch::Cpu* cpu;
-        Process* processo_corente = nullptr;
-        uint16_t proximo_pid = 1;
-
     public:
-        uint16_t pc;
         explicit ProcessManager(Arch::Cpu* cpu);
         ~ProcessManager();
 
