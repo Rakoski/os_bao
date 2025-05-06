@@ -151,6 +151,7 @@ bool load_program(const std::string& filename) {
             proceso_corrente->save_context(cpuglobal);
             proceso_corrente->set_estado(ProcessState::running);
 
+            // seta novo processo
             std::vector<Process*>::iterator processo_gambi = std::find(todos_processo.begin(), todos_processo.end(), proceso_corrente);
             if (processo_gambi == todos_processo.end()) {
                 todos_processo.push_back(proceso_corrente);
