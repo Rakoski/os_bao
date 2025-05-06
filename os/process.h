@@ -43,7 +43,7 @@ namespace OS {
         // pode ser tanto o tamanho quanto o final (eu fiz como tamanho)
         uint16_t limite = 0;
 
-        std::vector<uint16_t> code;
+        std::vector<uint16_t> codigo_processo;
 
 
             [[nodiscard]] uint16_t get_pid() const {
@@ -86,12 +86,12 @@ namespace OS {
                 this->pid = pid;
             }
 
-            [[nodiscard]] std::vector<uint16_t> code1() const {
-                return code;
+            [[nodiscard]] std::vector<uint16_t> codigo_processo1() const {
+                return codigo_processo;
             }
 
-            void set_code(const std::vector<uint16_t> &code) {
-                this->code = code;
+            void set_codigo_processo(const std::vector<uint16_t> &codigo_processo) {
+                this->codigo_processo = codigo_processo;
             }
 
             [[nodiscard]] uint16_t pid2() const {
@@ -142,12 +142,12 @@ namespace OS {
                 this->base = base;
             }
 
-            [[nodiscard]] std::vector<uint16_t> code2() const {
-                return code;
+            [[nodiscard]] std::vector<uint16_t> codigo_processo2() const {
+                return codigo_processo;
             }
 
-            void set_code1(const std::vector<uint16_t> &code) {
-                this->code = code;
+            void set_codigo_processo1(const std::vector<uint16_t> &codigo_processo) {
+                this->codigo_processo = codigo_processo;
             }
 
             void do_mem_protection(Arch::Cpu* cpu) const {
@@ -163,7 +163,7 @@ namespace OS {
 
             void restore_context(Arch::Cpu* cpu) const;
 
-            Process(uint16_t pid, const std::string &name, const std::vector<uint16_t> &code);
+            Process(uint16_t pid, const std::string &name, const std::vector<uint16_t> &codigo_processo);
 
             ~Process();
 

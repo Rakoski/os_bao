@@ -141,6 +141,7 @@ bool load_program(const std::string& filename) {
             return false;
         }
 
+        // logo quando carrego o processo preciso colocar ele na memória física, mas só agr
         for (uint16_t i = 0; i < code.size(); i++) {
             cpuglobal->pmem_write(process->get_base() + i, code[i]);
         }
@@ -154,13 +155,13 @@ bool load_program(const std::string& filename) {
             proceso_corrente->save_context(cpuglobal);
             proceso_corrente->set_state(ProcessState::running);
 
-            auto it = std::find(todos_processo.begin(), todos_processo.end(), proceso_corrente);
-            if (it == todos_processo.end()) {
+            std::vector<Process*>::iterator processo_gambi = std::find(todos_processo.begin(), todos_processo.end(), proceso_corrente);
+            if (processo_gambi == todos_processo.end()) {
                 todos_processo.push_back(proceso_corrente);
             }
 
             proceso_corrente = nullptr;
-            for (auto* proc : todos_processo) {
+            for (Process* proc : todos_processo) {
                 if (proc->get_name() == "idle.bin") {
                     proceso_corrente = proc;
                     break;
@@ -171,6 +172,7 @@ bool load_program(const std::string& filename) {
                 proceso_corrente = todos_processo[0];
             }
 
+            //setando pra voltar pro idle
             if (proceso_corrente) {
                 proceso_corrente->set_state(ProcessState::running);
                 proceso_corrente->do_mem_protection(cpuglobal);
@@ -254,14 +256,14 @@ void process_command(const std::string& palavra) {
     else if (comando == "help") {
 
         terminal_println(cpuglobal, Arch::Terminal::Type::Command, "\nCOmandos:");
-        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "  load - carregar em arquivo, ");
+        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "  load - carregar um arquivo / processo ");
         terminal_println(cpuglobal, Arch::Terminal::Type::Command, "  kill - mata o programa rodando");
         terminal_println(cpuglobal, Arch::Terminal::Type::Command, "  exit - Sair the simulator");
-        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "  help - mostra esse menu né sonso");
+        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "  help - mostra esse menu");
     }
 
     else {
-        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "não conheçi esse comando: ", comando);
+        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "\nnao conheco esse comando: ", comando);
         terminal_println(cpuglobal, Arch::Terminal::Type::Command, "digite help pra ver os comandos");
     }
     terminal_print(cpuglobal, Arch::Terminal::Type::Command, "\n");
@@ -324,7 +326,7 @@ void syscall () {
         return;
     }
     
-    
+    // pega gpr (general purpose register)
     uint16_t cod_syscall = cpuglobal->get_gpr(0);
     
     switch (cod_syscall) {
@@ -363,7 +365,7 @@ void syscall () {
             std::string output;
             char caracterekk;
 
-            while ((caracterekk = static_cast<char>(cpuglobal->vmem_read(str_addr++))) != '\0') {
+            while ((caracterekk = (char) (cpuglobal->vmem_read(str_addr++))) != '\0') {
                 output += caracterekk;
             }
 
@@ -379,6 +381,7 @@ void syscall () {
         case 3:
         {
 
+            //registrador 1
             uint16_t value = cpuglobal->get_gpr(1);
             terminal_print(cpuglobal, Arch::Terminal::Type::App, value);
         }
