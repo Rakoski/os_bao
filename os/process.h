@@ -43,6 +43,7 @@ namespace OS {
         // pode ser tanto o tamanho quanto o final (eu fiz como tamanho)
         uint16_t limite = 0;
 
+        // tirar daqui colocar var local
         std::vector<uint16_t> codigo_processo;
 
 

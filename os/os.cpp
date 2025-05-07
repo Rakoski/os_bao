@@ -22,6 +22,10 @@ Arch::Cpu *cpuglobal;
 std::string command_buffer;
 Process* proceso_corrente = nullptr;
 uint16_t next_pid = 1;
+
+// modularizar
+// lista melhor p guardar processos
+
 std::vector<Process*> todos_processo;
 
 Process* create_process(const std::string& name, const std::vector<uint16_t>& code) {
@@ -171,7 +175,6 @@ bool load_program(const std::string& filename) {
             //setando pra voltar pro idle
             if (proceso_corrente) {
                 proceso_corrente->set_estado(ProcessState::running);
-                proceso_corrente->protege(cpuglobal);
                 proceso_corrente->restore_context(cpuglobal);
                 terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "rpocesso voltando: ", proceso_corrente->get_name());
             } else {
@@ -193,6 +196,7 @@ bool load_program(const std::string& filename) {
         return true;
     } catch (const Mylib::Exception& e) {
         terminal_println(cpuglobal, Terminal::Kernel, "excao brabissima!!!! tratar: ", e.what());
+        kill_proceso_corrente();
         return false;
     }
 }
@@ -340,6 +344,7 @@ void syscall () {
             Process* processo_do_idlebin = nullptr;
 
             for (auto* processo : todos_processo) {
+                //ponteiro p idle bin
                 if (processo->get_name() == "idle.bin") processo_do_idlebin = processo;
             }
 
@@ -361,6 +366,7 @@ void syscall () {
             std::string output;
             char caracterekk;
 
+            // mudar de volta p privado
             while ((caracterekk = (char) (cpuglobal->vmem_read(str_addr++))) != '\0') {
                 output += caracterekk;
             }
