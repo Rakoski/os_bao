@@ -34,6 +34,7 @@ namespace OS {
         uint16_t pid = 0;
         std::string name;
         ProcessState estado = ProcessState::ready;
+        uint16_t posicao = 0;
 
         uint16_t pc;
         std::array<uint16_t, Config::nregs> regs;
