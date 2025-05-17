@@ -89,19 +89,6 @@ void gerenciar_contexto() {
     }
 }
 
-void run_process() {
-    if (processo_rodando_no_momento) {
-        processo_rodando_no_momento->save_context(cpuglobal);
-        processo_rodando_no_momento->set_estado(ProcessState::running);
-
-        auto it = std::find(processos_rodando.begin(), processos_rodando.end(), processo_rodando_no_momento);
-        if (it == processos_rodando.end()) {
-            processos_rodando.push_back(processo_rodando_no_momento);
-        }
-
-    }
-}
-
 void gerenciar_troca_de_contexto() {
     processo_rodando_no_momento = processos_rodando[0];
     processo_rodando_no_momento->set_estado(ProcessState::running);
@@ -131,6 +118,18 @@ Process* create_process(const std::string& name, const std::vector<uint16_t>& co
     return process;
 }
 
+void run_process() {
+    if (!processo_rodando_no_momento) return;
+
+    processo_rodando_no_momento->save_context(cpuglobal);
+    processo_rodando_no_momento->set_estado(ProcessState::running);
+
+    auto processo = std::find(processos_rodando.begin(), processos_rodando.end(), processo_rodando_no_momento);
+    if (processo == processos_rodando.end()) {
+        processos_rodando.push_back(processo_rodando_no_momento);
+    }
+}
+
 
 void rerodar_idle() {
     Process* idle = find_idle();
@@ -147,19 +146,29 @@ void rerodar_idle() {
 void free_processo() {
     memory_manager->free_memory(processo_rodando_no_momento);
     delete processo_rodando_no_momento;
-    processo_rodando_no_momento = nullptr;
+
+    Process* idle = find_idle();
+    if (idle) {
+        processo_rodando_no_momento = idle;
+        processo_rodando_no_momento->set_estado(ProcessState::running);
+        processo_rodando_no_momento->restore_context(cpuglobal);
+    } else {
+        processo_rodando_no_momento = nullptr;
+    }
 }
 
 void kill_process() {
-    if (processo_rodando_no_momento && processo_rodando_no_momento->get_name() != "idle.bin") {
-        auto it = std::find(processos_rodando.begin(), processos_rodando.end(), processo_rodando_no_momento);
-        if (it != processos_rodando.end()) {
-            processos_rodando.erase(it);
-        }
-        free_processo();
-    } else {
-        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "\nnao pode matar o idle");
+    if (processo_rodando_no_momento && processo_rodando_no_momento->get_name() == "idle.bin") {
+        terminal_println(cpuglobal, Terminal::Kernel, "Não pode matar o processo idle!");
+        return;
     }
+
+    auto it = std::find(processos_rodando.begin(), processos_rodando.end(), processo_rodando_no_momento);
+    if (it != processos_rodando.end()) {
+        processos_rodando.erase(it);
+    }
+
+    free_processo();
 }
 
 void printar_help() {
@@ -219,21 +228,21 @@ void process_command(const std::string& palavra) {
 
 void tratar_excecao() {
     const auto& exception = cpuglobal->get_ref_cpu_exception();
-    terminal_println(cpuglobal, Terminal::Kernel, "excesao das braba", exception.type, "no endereço: ", exception.vaddr);
+    terminal_println(cpuglobal, Terminal::Kernel, "excesao das braba\n", exception.type, "\nno endereço: \n", exception.vaddr);
 
-    if (processo_rodando_no_momento) {
-        if (processo_rodando_no_momento->get_name() == "idle.bin") {
-            terminal_println(cpuglobal, Terminal::Kernel, "Exceção no processo idle, reiniciando...");
-            auto it = std::find(processos_rodando.begin(), processos_rodando.end(), processo_rodando_no_momento);
-            if (it != processos_rodando.end()) {
-                processos_rodando.erase(it);
-            }
-            free_processo();
-            load_program("idle.bin");
-        } else {
-            terminal_println(cpuglobal, Terminal::Kernel, "MATANDO O PROCESSO!!!!!! dale excessao nele");
-            kill_process();
+    if (!processo_rodando_no_momento) return;
+
+    if (processo_rodando_no_momento->get_name() == "idle.bin") {
+        terminal_println(cpuglobal, Terminal::Kernel, "Exceção no processo idle, reiniciando...");
+        auto it = std::find(processos_rodando.begin(), processos_rodando.end(), processo_rodando_no_momento);
+        if (it != processos_rodando.end()) {
+            processos_rodando.erase(it);
         }
+        free_processo();
+        load_program("idle.bin");
+    } else {
+        terminal_println(cpuglobal, Terminal::Kernel, "MATANDO O PROCESSO!!!!!! dale excessao nele");
+        kill_process();
     }
 }
 
@@ -322,7 +331,7 @@ bool load_program(const std::string& filename) {
 
         return true;
     } catch (const Mylib::Exception& e) {
-        terminal_println(cpuglobal, Terminal::Kernel, "excao brabissima!!!! tratar: ", e.what());
+        terminal_println(cpuglobal, Terminal::Kernel, "execao brabissima!!!!!! tratandooou vamo matar ele!! ", e.what());
         kill_process();
         return false;
     }
@@ -364,7 +373,7 @@ void syscall() {
 
         default:
             terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "kakakka q porra de cod syscall é esse vei: ", cod_syscall);
-        break;
+            break;
 
     }
 }
