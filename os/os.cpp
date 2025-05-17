@@ -228,7 +228,7 @@ void process_command(const std::string& palavra) {
 
 void tratar_excecao() {
     const auto& exception = cpuglobal->get_ref_cpu_exception();
-    terminal_println(cpuglobal, Terminal::Kernel, "excesao das braba\n", exception.type, "\nno endereço: \n", exception.vaddr);
+    terminal_println(cpuglobal, Terminal::Kernel, "excesao brabissima\n", exception.type, "\nno endereço: \n", exception.vaddr);
 
     if (!processo_rodando_no_momento) return;
 
