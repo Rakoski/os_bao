@@ -40,4 +40,6 @@ add_executable(
         arch/timer.h
         os/utils.cpp
         os/utils.h
+        os/paging.cpp
+        os/paging.h
 )
