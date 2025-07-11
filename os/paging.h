@@ -24,7 +24,7 @@ namespace OS {
 
         Paging();
 
-        uint16_t aloca_pagina_virtual();
+        uint16_t aloca_pagina_fisica_livre();
 
         void libera_pagina(uint16_t id_pagina);
 
@@ -35,9 +35,7 @@ namespace OS {
         bool mapeia_paginas_pra_um_processo(Arch::Cpu::PageTable* tabela_paginas, uint16_t comeco_vmem_pagina,
             uint16_t numero_paginas, bool legivel, bool escrevivel, bool executavel);
 
-        bool aloca_pagina_falha(uint16_t pagina_fisica_vai_ser_alocada, std::vector<uint16_t> paginas_vao_ser_alocadas);
-
-        void libera_mapeamento(Arch::Cpu::PageTable* tabela);
+        void libera_paginas_fisicas(Arch::Cpu::PageTable* tabela);
     };
 
     extern Paging* paging;
