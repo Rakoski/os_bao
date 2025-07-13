@@ -4,6 +4,8 @@
 
 #include "paging.h"
 #include "os.h"
+#include "process.h"
+#include "process_manager.h"
 
 namespace OS {
 
@@ -12,10 +14,7 @@ namespace OS {
 
     Paging::Paging() : prox_pag_livre(0), paginas_em_uso(0) {
         // paginas todas livres
-        for (uint16_t i = 0; i < PAGINAS_TOTAIS; i++) {
-            paginas_livres[i] = 1;
-        }
-        
+        paginas_livres.set(0, PAGINAS_TOTAIS, 1);
         prox_pag_livre = 0;
     }
 
@@ -53,6 +52,7 @@ namespace OS {
         for (uint16_t i = 0; i < Config::ptes_per_table; i++) {
             (*novaTabela)[i] = 0;
             (*novaTabela)[i][Arch::Cpu::PteField::Present] = 0;
+            (*novaTabela)[i][Arch::Cpu::PteField::PhyFrameID] = 0; // pra ter demand paging precisa de informacao nos bits nao usados
         }
         return novaTabela;
     }
@@ -77,24 +77,17 @@ namespace OS {
         paginas_vao_ser_alocadas.reserve(numero_paginas);
 
         for (uint16_t i = 0; i < numero_paginas; i++) {
-            uint16_t pagina_fisica = aloca_pagina_virtual();
-            if (pagina_fisica == -1) {
-                for (uint16_t pagina : paginas_vao_ser_alocadas) libera_pagina(pagina);
-                return false;
-            }
-
-            paginas_vao_ser_alocadas.push_back(pagina_fisica);
-
             uint16_t indice_memoria_virtual = comeco_vmem_pagina + i;
-
-            (*tabela_paginas)[indice_memoria_virtual] = 0;
-            (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::PhyFrameID] = pagina_fisica;
-            (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Present] = 1;
+            (*tabela_paginas)[indice_memoria_virtual] = 0; // "alocação de memória só será efetivada no primeiro acesso."
+            (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Present] = 0;
             (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Readable] = legivel ? 1 : 0;
             (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Writable] = escrevivel ? 1 : 0;
             (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Executable] = executavel ? 1 : 0;
             (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Dirty] = 0;
             (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Accessed] = 0;
+
+            (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Foo] = 1; // valido mas nao tem nada ainda
+
         }
         return true;
     }
@@ -113,4 +106,22 @@ namespace OS {
             }
         }
     }
+
+    Arch::Cpu::PageTable* get_tabela_processo() {
+        extern ProcessManager* gerenciador;
+        if (!gerenciador)
+
+        Process* processo = gerenciador->get_current_process();
+
+        if (!processo) return nullptr;
+        return processo->get_tabela_paginas();
+    }
+
+    void Paging::page_fault(uint16_t endereco, uint16_t codigo_erro) {
+        uint16_t pagina_memoria_virtual = endereco >> Config::page_size; /// kkkkk divisao não pode pqp its over
+
+        Arch::Cpu::PageTable* tabela =
+
+    }
+
 }

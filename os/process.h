@@ -36,8 +36,9 @@ namespace OS {
         ProcessState estado = ProcessState::ready;
         uint16_t posicao = 0;
 
+
         uint16_t pc;
-        std::array<uint16_t, Config::nregs> regs;
+        std::array<uint16_t, Config::nregs> regs{};
 
         uint16_t base = 0;
 
@@ -47,8 +48,9 @@ namespace OS {
         // tirar daqui colocar var local
         std::vector<uint16_t> codigo_processo;
 
+        Arch::Cpu::PageTable* tabela_paginas = nullptr;
 
-            [[nodiscard]] uint16_t get_pid() const {
+        [[nodiscard]] uint16_t get_pid() const {
                 return pid;
             }
 
@@ -152,10 +154,18 @@ namespace OS {
                 this->codigo_processo = codigo_processo;
             }
 
-            void protege(Arch::Cpu* cpu) const {
+        [[nodiscard]] Arch::Cpu::PageTable * get_tabela_paginas() const {
+            return tabela_paginas;
+        }
+
+        void set_tabela_paginas(Arch::Cpu::PageTable *tabela) {
+            this->tabela_paginas = tabela;
+        }
+
+        void protege(Arch::Cpu* cpu) const {
 
                 // n deixa acessar o end de cada um
-                cpu->set_vmem_mode(Arch::Cpu::BaseLimit);
+                cpu->set_vmem_mode(Arch::Cpu::Paging);
                 cpu->set_vmem_paddr_base(base);
                 cpu->set_vmem_size(limite);
             }
@@ -163,9 +173,9 @@ namespace OS {
         //context swtiching
             void save_contect_cpu(Arch::Cpu* cpu);
 
-            void save_context(Arch::Cpu *cpu);
+            void salvar_contexto(Arch::Cpu *cpu);
 
-            void restore_context(Arch::Cpu* cpu) const;
+            void restaurar_contexto(Arch::Cpu* cpu) const;
 
             Process(uint16_t pid, const std::string &name, const std::vector<uint16_t> &codigo_processo);
 

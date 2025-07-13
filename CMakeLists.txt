@@ -42,4 +42,6 @@ add_executable(
         os/utils.h
         os/paging.cpp
         os/paging.h
+        os/process_manager.cpp
+        os/process_manager.h
 )

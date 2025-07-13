@@ -10,7 +10,9 @@
 #include "os.h"
 #include "memory_manager.h"
 #include "os-lib.h"
+#include "paging.h"
 #include "process.h"
+#include "process_manager.h"
 #include "utils.h"
 
 namespace OS {
@@ -20,23 +22,14 @@ std::string command_buffer;
 Process* processo_rodando_no_momento = nullptr;
 uint16_t proximo_pid = 1;
 std::vector<Process*> processos_rodando;
+Paging* paginacao = nullptr;
+ProcessManager* gerenciador_processos = nullptr;
 
 void kill_process();
 void rerodar_idle();
 bool load_program(const std::string& filename);
 void tratar_interrupcao_teclado();
 void tratar_excecao();
-void syscall_0();
-void syscall_1();
-
-Process* find_idle() {
-    for (Process* processo : processos_rodando) {
-        if (processo->get_name() == "idle.bin") {
-            return processo;
-        }
-    }
-    return nullptr;
-}
 
 bool alocar_memoria_para_processo(Process* process, const std::vector<uint16_t>& codigo) {
     if (uint16_t tamanho_preciso = codigo.size(); !memory_manager->allocate_memory_for_process(process, tamanho_preciso)) {
@@ -53,19 +46,29 @@ bool alocar_memoria_para_processo(Process* process, const std::vector<uint16_t>&
 }
 
 Process* criar_e_configurar_processo(const std::string& filename, const std::vector<uint16_t>& codigo) {
-    static uint16_t proximo_pid = 1;
     uint16_t pid = proximo_pid++;
 
-    Process* process = new Process(pid, filename, codigo);
+    Process* novo_processo = new Process(pid, filename, codigo);
 
-    if (!alocar_memoria_para_processo(process, codigo)) {
+    Arch::Cpu::PageTable* nova_tabela = paginacao->cria_tabela_paginas();
+    novo_processo->set_tabela_paginas(nova_tabela);
+
+    uint16_t tamanho = codigo.size() * sizeof(uint16_t);
+    uint16_t paginas_necessarias = (tamanho + Config::page_size - 1) / Config::page_size;
+
+    bool sucesso = paginacao->mapeia_paginas_pra_um_processo(nova_tabela, 0, paginas_necessarias, true, true, true);
+
+    if (!sucesso) {
+        delete novo_processo;
         return nullptr;
     }
 
-    process->set_pc(1);
-    Utils::setando_novos_regs_pro_processo(process);
+    novo_processo->set_pc(1);
+    novo_processo->set_limite(paginas_necessarias * Config::page_size);
 
-    return process;
+    Utils::setando_novos_regs_pro_processo(novo_processo);
+
+    return novo_processo;
 }
 
 std::vector<uint16_t> carregar_codigo_do_arquivo(const std::string& filename) {
@@ -75,53 +78,10 @@ std::vector<uint16_t> carregar_codigo_do_arquivo(const std::string& filename) {
     return codigo;
 }
 
-void gerenciar_contexto() {
-    Process* idle = find_idle();
-    if (idle) {
-        processo_rodando_no_momento = idle;
-        processo_rodando_no_momento->set_estado(ProcessState::running);
-        processo_rodando_no_momento->restore_context(cpuglobal);
-        terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "voltndo para o processo: ", processo_rodando_no_momento->get_name());
-    } else {
-        cpuglobal->set_vmem_mode(VmemMode::BaseLimit);
-        cpuglobal->set_pc(0);
-        terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "cade o idle que tava aqui ?");
-    }
-}
-
-void gerenciar_troca_de_contexto() {
-    processo_rodando_no_momento = processos_rodando[0];
-    processo_rodando_no_momento->set_estado(ProcessState::running);
-    processo_rodando_no_momento->restore_context(cpuglobal);
-}
-
-void exibir_info_processo(Process* process) {
-    terminal_println(cpuglobal, Terminal::Kernel, "processo ", process->get_pid()," (", process->get_name(), ") foi carregado\n");
-    terminal_println(cpuglobal, Terminal::Kernel, "base: ", process->get_base(),", limite: ", process->get_limite(), "\n");
-}
-
-Process* create_process(const std::string& name, const std::vector<uint16_t>& code) {
-    Process* process = new Process(proximo_pid++, name, code);
-
-    if (uint16_t size_needed = code.size() + 64; !memory_manager->allocate_memory_for_process(process, size_needed)) {
-        terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "sem memória para alocar p processo: ", name);
-        delete process;
-        return nullptr;
-    }
-
-    for (uint16_t i = 0; i < code.size(); i++) {
-        cpuglobal->pmem_write(process->get_base() + i, code[i]);
-    }
-
-    process->set_pc(1);
-
-    return process;
-}
-
 void run_process() {
     if (!processo_rodando_no_momento) return;
 
-    processo_rodando_no_momento->save_context(cpuglobal);
+    processo_rodando_no_momento->salvar_contexto(cpuglobal);
     processo_rodando_no_momento->set_estado(ProcessState::running);
 
     auto processo = std::find(processos_rodando.begin(), processos_rodando.end(), processo_rodando_no_momento);
@@ -132,13 +92,13 @@ void run_process() {
 
 
 void rerodar_idle() {
-    Process* idle = find_idle();
+    Process* idle = Utils::find_idle();
 
     if (idle) {
         processo_rodando_no_momento = idle;
         processo_rodando_no_momento->set_estado(ProcessState::running);
         processo_rodando_no_momento->protege(cpuglobal);
-        processo_rodando_no_momento->restore_context(cpuglobal);
+        processo_rodando_no_momento->restaurar_contexto(cpuglobal);
         terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "vontado pro processo: ", processo_rodando_no_momento->get_name());
     }
 }
@@ -147,11 +107,11 @@ void free_processo() {
     memory_manager->free_memory(processo_rodando_no_momento);
     delete processo_rodando_no_momento;
 
-    Process* idle = find_idle();
+    Process* idle = Utils::find_idle();
     if (idle) {
         processo_rodando_no_momento = idle;
         processo_rodando_no_momento->set_estado(ProcessState::running);
-        processo_rodando_no_momento->restore_context(cpuglobal);
+        processo_rodando_no_momento->restaurar_contexto(cpuglobal);
     } else {
         processo_rodando_no_momento = nullptr;
     }
@@ -171,14 +131,6 @@ void kill_process() {
     free_processo();
 }
 
-void printar_help() {
-    terminal_println(cpuglobal, Arch::Terminal::Type::Command, "\nComandos disponíveis:");
-    terminal_println(cpuglobal, Arch::Terminal::Type::Command, "  load <arquivo> - Carrega um programa/processo");
-    terminal_println(cpuglobal, Arch::Terminal::Type::Command, "  kill - Termina o processo atual");
-    terminal_println(cpuglobal, Arch::Terminal::Type::Command, "  exit - Sai do simulador");
-    terminal_println(cpuglobal, Arch::Terminal::Type::Command, "  help - Mostra este menu de ajuda");
-}
-
 void processar_comandos(std::string comando, std::vector<std::string> args) {
     if (comando == "exit") {
         terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "Desligando...");
@@ -192,7 +144,7 @@ void processar_comandos(std::string comando, std::vector<std::string> args) {
     } else if (comando == "kill") {
         kill_process();
     } else if (comando == "help") {
-        printar_help();
+        Utils::printar_help();
     }
     else {
         terminal_println(cpuglobal, Arch::Terminal::Type::Command, "Digite 'help' para ver os comandos disponíveis");
@@ -266,7 +218,7 @@ void tratar_interrupcao_teclado() {
     }
 }
 
-void syscall_0() {
+void syscall_0_fechar_processo() {
     terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "=( o processo pediu pra sair ----> tadinho <---");
     std::string process_name = processo_rodando_no_momento->get_name();
 
@@ -281,7 +233,7 @@ void syscall_0() {
     }
 }
 
-void syscall_1() {
+void syscall_1_imprimir_string() {
     uint16_t str_addr = cpuglobal->get_gpr(1);
     std::string output;
     char caractere;
@@ -306,6 +258,8 @@ void boot(Arch::Cpu *cpu) {
     cpuglobal = cpu;
     printa_menu(cpu);
     memory_manager = new MemoryManager(Config::phys_mem_size_words);
+    paginacao = new Paging();
+    gerenciador_processos = new ProcessManager(cpu);
     load_program("idle.bin");
 }
 
@@ -317,17 +271,20 @@ bool load_program(const std::string& filename) {
     try {
         std::vector<uint16_t> codigo = carregar_codigo_do_arquivo(filename);
 
-        Process* process = criar_e_configurar_processo(filename, codigo);
-        if (!process) return false;
+        Process* processo = criar_e_configurar_processo(filename, codigo);
+        if (!processo) return false;
 
         run_process();
-        gerenciar_contexto();
 
-        processo_rodando_no_momento = process;
-        process->protege(cpuglobal);
-        processos_rodando.push_back(process);
+        processo_rodando_no_momento = processo;
+        cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
+        cpuglobal->set_page_table(processo->get_tabela_paginas());
 
-        exibir_info_processo(process);
+        processos_rodando.push_back(processo);
+
+        processo->set_pc(1);
+        cpuglobal->set_pc(1);
+        Utils::exibir_info_processo(processo);
 
         return true;
     } catch (const Mylib::Exception& e) {
@@ -352,12 +309,12 @@ void syscall() {
 
     switch (cod_syscall) {
         case 0: {
-            syscall_0();
+            syscall_0_fechar_processo();
             break;
         }
 
         case 1: {
-            syscall_1();
+            syscall_1_imprimir_string();
             break;
         }
 
@@ -392,6 +349,17 @@ void shutdown() {
     for (Process* proc : processos_rodando) {
         delete proc;
     }
+
+    if (gerenciador_processos) {
+        delete gerenciador_processos;
+        gerenciador_processos = nullptr;
+    }
+
+    if (paginacao) {
+        delete paginacao;
+        paginacao = nullptr;
+    }
+
     processos_rodando.clear();
     cpuglobal->turn_off();
 }

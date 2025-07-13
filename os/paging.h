@@ -36,6 +36,8 @@ namespace OS {
             uint16_t numero_paginas, bool legivel, bool escrevivel, bool executavel);
 
         void libera_paginas_fisicas(Arch::Cpu::PageTable* tabela);
+
+        void page_fault(uint16_t endereco, uint16_t codigo_erro);
     };
 
     extern Paging* paging;
