@@ -12,6 +12,10 @@ namespace OS {
     Paging* paging = nullptr;
     uint16_t DEU_RUIM_ALOCAR_PAGINA = -1;
 
+    std::vector<bool> paginas_livres;
+    uint16_t prox_pag_livre;
+    uint16_t paginas_em_uso;
+
     Paging::Paging() : prox_pag_livre(0), paginas_em_uso(0) {
         // paginas todas livres
         paginas_livres.set(0, PAGINAS_TOTAIS, 1);
@@ -107,17 +111,7 @@ namespace OS {
         }
     }
 
-    Arch::Cpu::PageTable* get_tabela_processo() {
-        extern ProcessManager* gerenciador;
-        if (!gerenciador)
-
-        Process* processo = gerenciador->get_current_process();
-
-        if (!processo) return nullptr;
-        return processo->get_tabela_paginas();
-    }
-
-    void Paging::page_fault(uint16_t endereco, uint16_t codigo_erro) {
+    void Paging::page_fault(uint16_t endereco, Arch::Cpu::CpuException::Type codigo_erro, Arch::Cpu* cpuglobal, Process* processo_do_momento) {
         uint16_t pagina_memoria_virtual = endereco >> Config::page_size; /// kkkkk divisao não pode pqp its over
 
         Arch::Cpu::PageTable* tabela =

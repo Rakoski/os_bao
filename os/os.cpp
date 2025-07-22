@@ -31,6 +31,21 @@ bool load_program(const std::string& filename);
 void tratar_interrupcao_teclado();
 void tratar_excecao();
 
+void carregar_primeira_pagina_fisica(uint16_t paginas_necessarias, Arch::Cpu::PageTable* nova_tabela, std::vector<uint16_t> codigo) {
+    if (paginas_necessarias > 0) {
+        uint16_t primeira_pagina_fisica = paginacao->aloca_pagina_fisica_livre();
+        if (primeira_pagina_fisica != -1) {
+            (*nova_tabela)[0][Arch::Cpu::PteField::PhyFrameID] = primeira_pagina_fisica;
+            (*nova_tabela)[0][Arch::Cpu::PteField::Present] = 1;
+
+            uint16_t endereco_fisico_base = primeira_pagina_fisica * Config::page_size;
+            for (uint16_t i = 0; i < codigo.size() && i < Config::page_size; i++) {
+                cpuglobal->pmem_write(endereco_fisico_base + i, codigo[i]);
+            }
+        }
+    }
+}
+
 bool alocar_memoria_para_processo(Process* process, const std::vector<uint16_t>& codigo) {
     if (uint16_t tamanho_preciso = codigo.size(); !memory_manager->allocate_memory_for_process(process, tamanho_preciso)) {
         terminal_println(cpuglobal, Terminal::Kernel, "sem memória pra esse nvo processo!");
@@ -62,6 +77,8 @@ Process* criar_e_configurar_processo(const std::string& filename, const std::vec
         delete novo_processo;
         return nullptr;
     }
+
+    carregar_primeira_pagina_fisica(paginas_necessarias, nova_tabela, codigo);
 
     novo_processo->set_pc(1);
     novo_processo->set_limite(paginas_necessarias * Config::page_size);
@@ -97,6 +114,10 @@ void rerodar_idle() {
     if (idle) {
         processo_rodando_no_momento = idle;
         processo_rodando_no_momento->set_estado(ProcessState::running);
+
+        cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
+        cpuglobal->set_page_table(idle->get_tabela_paginas());
+
         processo_rodando_no_momento->protege(cpuglobal);
         processo_rodando_no_momento->restaurar_contexto(cpuglobal);
         terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "vontado pro processo: ", processo_rodando_no_momento->get_name());
@@ -104,13 +125,16 @@ void rerodar_idle() {
 }
 
 void free_processo() {
-    memory_manager->free_memory(processo_rodando_no_momento);
+    if (processo_rodando_no_momento->get_tabela_paginas()) {
+        paginacao->libera_tabela_paginas(processo_rodando_no_momento->get_tabela_paginas());
+    }
     delete processo_rodando_no_momento;
 
     Process* idle = Utils::find_idle();
     if (idle) {
         processo_rodando_no_momento = idle;
         processo_rodando_no_momento->set_estado(ProcessState::running);
+        cpuglobal->set_vmem_mode(Arch::Cpu::Paging);
         processo_rodando_no_momento->restaurar_contexto(cpuglobal);
     } else {
         processo_rodando_no_momento = nullptr;
@@ -183,6 +207,10 @@ void tratar_excecao() {
     terminal_println(cpuglobal, Terminal::Kernel, "excesao brabissima\n", exception.type, "\nno endereço: \n", exception.vaddr);
 
     if (!processo_rodando_no_momento) return;
+
+    if (exception.type == Arch::Cpu::CpuException::Type::VmemPageFault) {
+        paginacao->page_fault(exception.vaddr, exception.type);
+    }
 
     if (processo_rodando_no_momento->get_name() == "idle.bin") {
         terminal_println(cpuglobal, Terminal::Kernel, "Exceção no processo idle, reiniciando...");

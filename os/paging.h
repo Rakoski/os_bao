@@ -37,7 +37,7 @@ namespace OS {
 
         void libera_paginas_fisicas(Arch::Cpu::PageTable* tabela);
 
-        void page_fault(uint16_t endereco, uint16_t codigo_erro);
+        void page_fault(uint16_t endereco, Arch::Cpu::CpuException::Type codigo_erro);
     };
 
     extern Paging* paging;
