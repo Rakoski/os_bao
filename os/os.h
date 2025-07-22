@@ -37,7 +37,6 @@ namespace OS {
 
     void process_command(const std::string& cmd);
 
-    
     void process_keyboard_input(char c);
 
     

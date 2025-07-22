@@ -10,33 +10,49 @@
 #include "process.h"
 
 namespace OS {
+    Process::Process(uint16_t pid, const std::string& name, const std::vector<uint16_t>& codigo_proceso)
+    : pid(pid), name(name), estado(ProcessState::ready), pc(0), base(0), limite(0), codigo_processo(codigo_proceso) {
 
-    class ProcessManager {
-    public:
-        explicit ProcessManager(Arch::Cpu* cpu);
-        ~ProcessManager();
+        for (uint16_t& reg : regs) {
+            reg = 0;
+        }
+    }
 
-        uint16_t create_process(const std::string& name, const std::vector<uint16_t>& code);
-        bool kill_process(uint16_t pid);
+    uint16_t Process::get_regs(const uint16_t number) const {
+        if (number < Config::nregs) {
+            return regs[number];
+        } else {
+            return 0;
+        }
+    }
 
-        void load_idle_process();
+    void Process::set_regs(uint16_t number, uint16_t value) {
+        if (number < Config::nregs) {
+            regs[number] = value;
+        }
+    }
 
-        void get_processo_corente();
+    void Process::salvar_contexto(Arch::Cpu* cpu) {
+        pc = cpu->get_pc();
 
-        void rodar_processo_corente();
+        for (uint16_t i = 0; i < Config::nregs; i++) {
+            regs[i] = cpu->get_gpr(i);
+        }
+    }
 
-        void schedule_next_process();
+    void Process::restaurar_contexto(Arch::Cpu* cpu) const {
+        cpu->set_pc(pc);
 
-        bool load_program(const std::string& filename);
-        void list_processes();
+        for (uint16_t i = 0; i < Config::nregs; i++) {
+            cpu->set_gpr(i, regs[i]);
+        }
 
-        void handle_exception(const Arch::Cpu::CpuException& exception);
 
-        void handle_syscall();
-    };
-
-    extern ProcessManager* process_manager;
-
+        cpu->set_vmem_mode(Arch::Cpu::VmemMode::BaseLimit);
+        cpu->set_vmem_paddr_base(base);
+        cpu->set_vmem_size(limite);
+    }
 }
 
 #endif // __SO_BAO_HEADER_PROCESS_MANAGER_H__
+
