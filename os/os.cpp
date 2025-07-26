@@ -273,7 +273,6 @@ void syscall_1_imprimir_string() {
     terminal_print(cpuglobal, Arch::Terminal::Type::App, output);
 }
 
-
 void printa_menu(Arch::Cpu *cpu) {
     terminal_println(cpu, Arch::Terminal::Type::Command, "Type commands here.");
     terminal_println(cpu, Arch::Terminal::Type::App, "Apps output here");
@@ -281,6 +280,19 @@ void printa_menu(Arch::Cpu *cpu) {
     terminal_println(cpu, Arch::Terminal::Type::Command, "Welcome to the OS terminal. Type 'help' for commands.");
     terminal_print(cpu, Arch::Terminal::Type::Command, ">");
 }
+
+void syscall_4_alocar_memoria() {
+    uint16_t tamanho = cpuglobal->get_gpr(1);
+
+    if (!processo_rodando_no_momento) {
+        cpuglobal->set_gpr(1, 0);
+        terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "falha ao alocar memória dinamicamente");
+        return;
+    }
+
+    uint16_t endereco = paginacao->alo
+}
+
 
 void boot(Arch::Cpu *cpu) {
     cpuglobal = cpu;

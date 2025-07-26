@@ -3,6 +3,8 @@
 //
 
 #include "paging.h"
+
+#include "os-lib.h"
 #include "os.h"
 #include "process.h"
 #include "process_manager.h"
@@ -77,9 +79,6 @@ namespace OS {
 
         if (!tabela_paginas || mapeamento_passa_limite_tabela) return false;
 
-        std::vector<uint16_t> paginas_vao_ser_alocadas;
-        paginas_vao_ser_alocadas.reserve(numero_paginas);
-
         for (uint16_t i = 0; i < numero_paginas; i++) {
             uint16_t indice_memoria_virtual = comeco_vmem_pagina + i;
             (*tabela_paginas)[indice_memoria_virtual] = 0; // "alocação de memória só será efetivada no primeiro acesso."
@@ -106,16 +105,76 @@ namespace OS {
             if (entrada[Arch::Cpu::PteField::Present] == 1) {
                 uint16_t pagina_fisica = entrada[Arch::Cpu::PteField::PhyFrameID];
                 libera_pagina(pagina_fisica);
-                entrada = 0;
             }
+            entrada = 0;
         }
     }
 
-    void Paging::page_fault(uint16_t endereco, Arch::Cpu::CpuException::Type codigo_erro, Arch::Cpu* cpuglobal, Process* processo_do_momento) {
-        uint16_t pagina_memoria_virtual = endereco >> Config::page_size; /// kkkkk divisao não pode pqp its over
+    ResultadoAlocarPagina Paging::page_fault(uint16_t endereco, Arch::Cpu::CpuException::Type codigo_erro, Arch::Cpu* cpuglobal, Process* processo_do_momento) {
+        uint16_t pagina_memoria_virtual = endereco >> Config::page_size_bits; /// kkkkk divisao não pode pqp its over
 
-        Arch::Cpu::PageTable* tabela =
+        Arch::Cpu::PageTable* tabela = processo_do_momento->get_tabela_paginas();
+
+        Arch::Cpu::PageTableEntry& entrada = (*tabela)[pagina_memoria_virtual];
+        bool valida_mas_nao_presente = entrada[Arch::Cpu::PteField::Foo] == 1 && entrada[Arch::Cpu::PteField::Present] == 0;
+        bool acesso_incorreto = entrada[Arch::Cpu::PteField::Foo] == 0;
+        bool acesso_violante = entrada[Arch::Cpu::PteField::Present] == 1;
+
+        if (valida_mas_nao_presente) {
+            terminal_println(cpuglobal, Terminal::Kernel, "demanda paging ok");
+            uint16_t pagina_finsica = aloca_pagina_fisica_livre();
+
+            if (pagina_finsica == DEU_RUIM_ALOCAR_PAGINA) {
+                terminal_println(cpuglobal, Terminal::Kernel, "DEU RUIM ALOCAR PÁGINA");
+                return ResultadoAlocarPagina::erro_processo_ou_na_tabela;
+            }
+
+            entrada[Arch::Cpu::PteField::PhyFrameID] = pagina_finsica;
+            entrada[Arch::Cpu::PteField::Present] = 1;
+            entrada[Arch::Cpu::PteField::Accessed] = 1;
+
+            uint16_t endereco_fisico = pagina_finsica * Config::page_size;
+
+            for (uint16_t i = 0; i < Config::page_size; i++) {
+                cpuglobal->pmem_write(endereco_fisico + 1, 0);
+            }
+
+            terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada no endereco: " + endereco_fisico);
+            return ResultadoAlocarPagina::deu_bom;
+        }
+        if (acesso_incorreto) {
+            return ResultadoAlocarPagina::acesso_invalido;
+        }
+        if (acesso_violante) {
+            terminal_println(cpuglobal, Terminal::Kernel, "acesso_violante");
+
+            switch (codigo_erro) {
+                case Arch::Cpu::CpuException::Type::VmemGPFnotReadable:
+                    terminal_println(cpuglobal, Terminal::Kernel, "VmemGPFnotReadable");
+                    break;
+                case Arch::Cpu::CpuException::Type::VmemGPFnotWritable:
+                    terminal_println(cpuglobal, Terminal::Kernel, "VmemGPFnotWritable");
+                    break;
+                case Arch::Cpu::CpuException::Type::VmemGPFnotExecutable:
+                    terminal_println(cpuglobal, Terminal::Kernel, "VmemGPFnotExecutable");
+                    break;
+                default:
+                    break;
+            }
+
+            return ResultadoAlocarPagina::acesso_violante;
+        }
+        return ResultadoAlocarPagina::erro_processo_ou_na_tabela;
+    }
+
+    uint16_t Paging::aloca_dinamicamente(uint16_t tamanho_words, Process *processo) {
+        Arch::Cpu::PageTable* tabela = processo->get_tabela_paginas();
+
+        uint16_t paginas_necessarias = (tamanho_words + Config::page_size - 1) / Config::page_size;
+
+        uint16_t pagina_inicial = 0;
 
     }
+
 
 }

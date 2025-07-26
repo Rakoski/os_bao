@@ -8,11 +8,19 @@
 #include <cstdint>
 #include <memory>
 
+#include "process.h"
 #include "../config.h"
 #include "../arch/arch.h"
 #include "my-lib/bit.h"
 
 namespace OS {
+    enum class ResultadoAlocarPagina {
+        deu_bom,
+        acesso_invalido,
+        acesso_violante,
+        erro_processo_ou_na_tabela
+    };
+
     class Paging {
 
     public:
@@ -37,7 +45,9 @@ namespace OS {
 
         void libera_paginas_fisicas(Arch::Cpu::PageTable* tabela);
 
-        void page_fault(uint16_t endereco, Arch::Cpu::CpuException::Type codigo_erro);
+        ResultadoAlocarPagina page_fault(uint16_t endereco, Arch::Cpu::CpuException::Type codigo_erro, Arch::Cpu* cpuglobal, Process* processo_do_momento);
+
+        uint16_t aloca_dinamicamente(uint16_t tamanho_words, Process* processo);
     };
 
     extern Paging* paging;
