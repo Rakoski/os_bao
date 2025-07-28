@@ -23,6 +23,9 @@ namespace OS {
 
     class Paging {
 
+    private:
+        bool encontrar_espaco_consecutivo_pras_pags(Arch::Cpu::PageTable* tabela, uint16_t paginas_necessarias, uint16_t &pagina_inicial, Arch::Cpu* cpuglobal);
+
     public:
 
         Mylib::BitSet<Config::phys_mem_size_words / Config::page_size> paginas_livres;
@@ -47,7 +50,7 @@ namespace OS {
 
         ResultadoAlocarPagina page_fault(uint16_t endereco, Arch::Cpu::CpuException::Type codigo_erro, Arch::Cpu* cpuglobal, Process* processo_do_momento);
 
-        uint16_t aloca_dinamicamente(uint16_t tamanho_words, Process* processo);
+        uint16_t aloca_dinamicamente(Arch::Cpu* cpuglobal, uint16_t tamanho_words, Process* processo);
     };
 
     extern Paging* paging;

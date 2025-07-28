@@ -3,7 +3,7 @@
 //
 
 #include "paging.h"
-
+#include <cmath>
 #include "os-lib.h"
 #include "os.h"
 #include "process.h"
@@ -167,14 +167,65 @@ namespace OS {
         return ResultadoAlocarPagina::erro_processo_ou_na_tabela;
     }
 
-    uint16_t Paging::aloca_dinamicamente(uint16_t tamanho_words, Process *processo) {
+    uint16_t Paging::aloca_dinamicamente(Arch::Cpu* cpuglobal, uint16_t tamanho_solicitado, Process *processo) {
         Arch::Cpu::PageTable* tabela = processo->get_tabela_paginas();
 
-        uint16_t paginas_necessarias = (tamanho_words + Config::page_size - 1) / Config::page_size;
+        // quantas paginas são necessárioas
+        // a conta - tanto de words (tipo 20) + configuração (16) - 1 / 16  (ceiling division) OU ceil(tanto de words / config)
+        // esse menos 1 pesquisei era tipo se vc tem 17 words e cada página tem 16 eu preciso de 2 páginas inteiras, não 1,0625 páginas
+        // perguntar isso pro prof nao entendi muito bem
+        uint16_t paginas_necessarias = std::ceil((double) (tamanho_solicitado) / Config::page_size);
 
         uint16_t pagina_inicial = 0;
+        bool tem_espaco = encontrar_espaco_consecutivo_pras_pags(tabela, paginas_necessarias, pagina_inicial, cpuglobal);
 
+        if (!tem_espaco) {
+            terminal_println(cpuglobal, Terminal::Kernel, "não encontrou espaço p alocacao dinamica");
+            return DEU_RUIM_ALOCAR_PAGINA;
+        }
+
+        mapeia_paginas_pra_um_processo(tabela, pagina_inicial, paginas_necessarias, true, true, true); // area de dados nao pode executar? perguntar pro prof
+
+        // como calcular o endereço virtual é dividido em offset e numero
+        // Endereço físico 7 × 4096 + 742 = 29414 // dp pdf
+        // TENHO UM ENDEREÇO E QUERO ACHAR A PÁGINA FÍSICA
+        // número_da_página = endereço_virtual / tamanho_da_página;
+        // offset = endereço_virtual % tamanho_da_página;
+
+        // TENHO A PÁGINA virtual - como as páginas são consecutivas na memória
+        // a página 3 -> sempre vai ser dos endereço 12288 ao 16383
+
+        uint16_t endereco_virtual = pagina_inicial * Config::page_size;
+
+        return endereco_virtual;
     }
+
+    bool Paging::encontrar_espaco_consecutivo_pras_pags(Arch::Cpu::PageTable* tabela, uint16_t paginas_necessarias, uint16_t &pagina_inicial, Arch::Cpu* cpuglobal) {
+        terminal_println(cpuglobal, Terminal::Kernel, "encontrando espaço junto consec: ");
+        uint16_t pags_consec = 0;
+        pagina_inicial = 0;
+
+        for (uint16_t i = 0; i < Config::ptes_per_table; i++) {
+            // meu foo significa se ta livre ou nn
+            if ((*tabela)[i][Arch::Cpu::PteField::Foo] == 0) {
+                pags_consec++;
+
+                if (pags_consec == 1) pagina_inicial = 1;
+                terminal_println(cpuglobal, Terminal::Kernel, "encontrou esp consec: ");
+                if (pags_consec > paginas_necessarias) return true;
+            }
+
+            terminal_println(cpuglobal, Terminal::Kernel, "ainda não encontrou: ");
+            if (pags_consec > 0) pags_consec = 0;
+            continue;
+        }
+
+        terminal_println(cpuglobal, Terminal::Kernel, "retornou false ao encontrar espaço consecutivo: ");
+        return false;
+    }
+
+
+
 
 
 }
