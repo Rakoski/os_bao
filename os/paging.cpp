@@ -95,7 +95,7 @@ namespace OS {
         return true;
     }
 
-    void Paging::libera_paginas_fisicas(Arch::Cpu::PageTable* tabela_do_processo) {
+    void Paging::libera_paginas_fisicas(Arch::Cpu::PageTable* tabela_do_processo, uint16_t tamanho) {
         if (!tabela_do_processo) return;
 
         for (uint16_t i = 0; i < Config::ptes_per_table; i++) {
@@ -187,7 +187,7 @@ namespace OS {
         mapeia_paginas_pra_um_processo(tabela, pagina_inicial, paginas_necessarias, true, true, true); // area de dados nao pode executar? perguntar pro prof
 
         // como calcular o endereço virtual é dividido em offset e numero
-        // Endereço físico 7 × 4096 + 742 = 29414 // dp pdf
+        // Endereço físico 7 × 4096 + 742 = 29414 // do pdf
         // TENHO UM ENDEREÇO E QUERO ACHAR A PÁGINA FÍSICA
         // número_da_página = endereço_virtual / tamanho_da_página;
         // offset = endereço_virtual % tamanho_da_página;
@@ -217,7 +217,6 @@ namespace OS {
 
             terminal_println(cpuglobal, Terminal::Kernel, "ainda não encontrou: ");
             if (pags_consec > 0) pags_consec = 0;
-            continue;
         }
 
         terminal_println(cpuglobal, Terminal::Kernel, "retornou false ao encontrar espaço consecutivo: ");

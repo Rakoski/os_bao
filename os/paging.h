@@ -46,7 +46,7 @@ namespace OS {
         bool mapeia_paginas_pra_um_processo(Arch::Cpu::PageTable* tabela_paginas, uint16_t comeco_vmem_pagina,
             uint16_t numero_paginas, bool legivel, bool escrevivel, bool executavel);
 
-        void libera_paginas_fisicas(Arch::Cpu::PageTable* tabela);
+        void libera_paginas_fisicas(Arch::Cpu::PageTable* tabela, uint16_t tamanho);
 
         ResultadoAlocarPagina page_fault(uint16_t endereco, Arch::Cpu::CpuException::Type codigo_erro, Arch::Cpu* cpuglobal, Process* processo_do_momento);
 

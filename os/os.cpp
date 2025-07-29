@@ -3,6 +3,7 @@
 #include <vector>
 #include <cstdint>
 #include <algorithm>
+#include <cmath>
 
 #include "../config.h"
 #include "../lib.h"
@@ -31,33 +32,19 @@ bool load_program(const std::string& filename);
 void tratar_interrupcao_teclado();
 void tratar_excecao();
 
-void carregar_primeira_pagina_fisica(uint16_t paginas_necessarias, Arch::Cpu::PageTable* nova_tabela, std::vector<uint16_t> codigo) {
-    if (paginas_necessarias > 0) {
-        uint16_t primeira_pagina_fisica = paginacao->aloca_pagina_fisica_livre();
-        if (primeira_pagina_fisica != -1) {
-            (*nova_tabela)[0][Arch::Cpu::PteField::PhyFrameID] = primeira_pagina_fisica;
-            (*nova_tabela)[0][Arch::Cpu::PteField::Present] = 1;
+void aloca_pagina_fisica(Process* novo_processo) {
+    uint16_t paginas_necessarias = std::ceil((double)novo_processo->codigo_processo.size() / Config::page_size);
 
-            uint16_t endereco_fisico_base = primeira_pagina_fisica * Config::page_size;
-            for (uint16_t i = 0; i < codigo.size() && i < Config::page_size; i++) {
-                cpuglobal->pmem_write(endereco_fisico_base + i, codigo[i]);
-            }
+    for (uint16_t i = 0; i < paginas_necessarias; i++) {
+        uint16_t nova_pagina = paging->aloca_pagina_fisica_livre();
+        uint16_t endereco_fisico = nova_pagina * Config::page_size;
+
+        for (uint16_t i = 0; i < Config::page_size; i++) {
+            cpuglobal->pmem_write(endereco_fisico + 1, 0);
         }
     }
-}
 
-bool alocar_memoria_para_processo(Process* process, const std::vector<uint16_t>& codigo) {
-    if (uint16_t tamanho_preciso = codigo.size(); !memory_manager->allocate_memory_for_process(process, tamanho_preciso)) {
-        terminal_println(cpuglobal, Terminal::Kernel, "sem memória pra esse nvo processo!");
-        memory_manager->free_memory(processo_rodando_no_momento);
-        return false;
-    }
-
-    for (uint16_t i = 0; i < codigo.size(); i++) {
-        cpuglobal->pmem_write(process->get_base() + i, codigo[i]);
-    }
-
-    return true;
+    terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada DE COMEÇO no endereco: " + endereco_fisico);
 }
 
 Process* criar_e_configurar_processo(const std::string& filename, const std::vector<uint16_t>& codigo) {
@@ -68,8 +55,8 @@ Process* criar_e_configurar_processo(const std::string& filename, const std::vec
     Arch::Cpu::PageTable* nova_tabela = paginacao->cria_tabela_paginas();
     novo_processo->set_tabela_paginas(nova_tabela);
 
-    uint16_t tamanho = codigo.size() * sizeof(uint16_t);
-    uint16_t paginas_necessarias = (tamanho + Config::page_size - 1) / Config::page_size;
+    uint16_t tamanho_codigo = codigo.size();
+    uint16_t paginas_necessarias = std::ceil((double)tamanho_codigo / Config::page_size);
 
     bool sucesso = paginacao->mapeia_paginas_pra_um_processo(nova_tabela, 0, paginas_necessarias, true, true, true);
 
@@ -78,11 +65,7 @@ Process* criar_e_configurar_processo(const std::string& filename, const std::vec
         return nullptr;
     }
 
-    carregar_primeira_pagina_fisica(paginas_necessarias, nova_tabela, codigo);
-
-    novo_processo->set_pc(1);
-    novo_processo->set_limite(paginas_necessarias * Config::page_size);
-
+    novo_processo->set_codigo_processo(codigo);
     Utils::setando_novos_regs_pro_processo(novo_processo);
 
     return novo_processo;
@@ -209,7 +192,7 @@ void tratar_excecao() {
     if (!processo_rodando_no_momento) return;
 
     if (exception.type == Arch::Cpu::CpuException::Type::VmemPageFault) {
-        paginacao->page_fault(exception.vaddr, exception.type);
+        paginacao->page_fault(exception.vaddr, exception.type, cpuglobal, processo_rodando_no_momento);
     }
 
     if (processo_rodando_no_momento->get_name() == "idle.bin") {
@@ -282,7 +265,6 @@ void printa_menu(Arch::Cpu *cpu) {
 }
 
 void syscall_4_alocar_memoria() {
-    uint16_t tamanho = cpuglobal->get_gpr(1);
 
     if (!processo_rodando_no_momento) {
         cpuglobal->set_gpr(1, 0);
@@ -290,7 +272,7 @@ void syscall_4_alocar_memoria() {
         return;
     }
 
-    uint16_t endereco = paginacao->alo
+    paging->aloca_dinamicamente(cpuglobal)
 }
 
 
