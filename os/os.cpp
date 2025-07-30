@@ -42,9 +42,9 @@ void aloca_pagina_fisica(Process* novo_processo) {
         for (uint16_t i = 0; i < Config::page_size; i++) {
             cpuglobal->pmem_write(endereco_fisico + 1, 0);
         }
+       terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada DE COMEÇO no endereco: " + endereco_fisico);
     }
 
-    terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada DE COMEÇO no endereco: " + endereco_fisico);
 }
 
 Process* criar_e_configurar_processo(const std::string& filename, const std::vector<uint16_t>& codigo) {
