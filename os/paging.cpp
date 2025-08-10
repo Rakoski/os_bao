@@ -151,7 +151,7 @@ namespace OS {
 
     ResultadoAlocarPagina Paging::page_fault(uint16_t endereco, Arch::Cpu::CpuException::Type codigo_erro, Arch::Cpu* cpuglobal, Process* processo_do_momento) {
         uint16_t pagina_memoria_virtual = endereco >> Config::page_size_bits; /// kkkkk divisao não pode pqp its over
-        terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "chamando page fault");
+        terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "chamando page fault pro processo: ", processo_do_momento->get_name());
 
         Arch::Cpu::PageTable* tabela = processo_do_momento->get_tabela_paginas();
 

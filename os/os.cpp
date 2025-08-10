@@ -129,7 +129,7 @@ void kill_process() {
         processos_rodando.erase(it);
     }
 
-    free_processo();
+    rerodar_idle();
 }
 
 void processar_comandos(std::string comando, std::vector<std::string> args) {
@@ -186,13 +186,12 @@ void tratar_excecao() {
     if (!processo_rodando_no_momento) return;
 
     if (exception.type == Arch::Cpu::CpuException::Type::VmemPageFault) {
-        auto resultado = paginacao->page_fault(exception.vaddr, exception.type, cpuglobal, processo_rodando_no_momento);
+        ResultadoAlocarPagina resultado = paginacao->page_fault(exception.vaddr, exception.type, cpuglobal, processo_rodando_no_momento);
 
         if (resultado == ResultadoAlocarPagina::deu_bom) {
             return;
         }
-        terminal_println(cpuglobal, Terminal::Kernel, "page fault deu ruim");
-        if (resultado == ResultadoAlocarPagina::erro_processo_ou_na_tabela && processo_rodando_no_momento->get_name() != "idle.bin") {
+        if (processo_rodando_no_momento->get_name() != "idle.bin") {
             terminal_println(cpuglobal, Terminal::Kernel, "matando processo:  ",  processo_rodando_no_momento->get_name());
             kill_process();
         }
@@ -257,9 +256,9 @@ void syscall_0_fechar_processo() {
     }
 
     free_processo();
-    // if (!processos_rodando.empty()) {
-    //     rerodar_idle();
-    // }
+    if (!processos_rodando.empty()) {
+        rerodar_idle();
+    }
 }
 
 void syscall_1_imprimir_string() {

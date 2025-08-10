@@ -21,20 +21,18 @@ namespace OS {
         erro_processo_ou_na_tabela
     };
 
-    // tava dando erro no compilador ao imprimir o resultado quando vou alocar alguma página
-    inline std::ostream& operator<<(std::ostream& os, const ResultadoAlocarPagina& resultado) {
-        switch (resultado) {
-            case ResultadoAlocarPagina::deu_bom:
-                return os << "deu_bom";
-            case ResultadoAlocarPagina::acesso_invalido:
-                return os << "acesso_invalido";
-            case ResultadoAlocarPagina::acesso_violante:
-                return os << "acesso_violante";
-            case ResultadoAlocarPagina::erro_processo_ou_na_tabela:
-                return os << "erro_processo_ou_na_tabela";
-            default:
-                return os << "unknown_resultado";
-        }
+    // tava dando erro no compilador ao imprimir o resultado se deu bom ou nao quando vou alocar alguma página
+    inline const char* enum_class_to_str(const ResultadoAlocarPagina value) {
+        static constexpr auto strs = std::to_array<const char*>({
+            "deu_bom",
+            "acesso_invalido",
+            "acesso_violante",
+            "erro_processo_ou_na_tabela"
+        });
+
+        mylib_assert_exception_msg(std::to_underlying(value) < strs.size(), "invalid value ", std::to_underlying(value))
+
+        return strs[std::to_underlying(value)];
     }
 
     class Paging {
