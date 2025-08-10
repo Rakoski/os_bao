@@ -36,6 +36,7 @@ namespace OS {
         ProcessState estado = ProcessState::ready;
         uint16_t posicao = 0;
 
+        Process();
 
         uint16_t pc;
         std::array<uint16_t, Config::nregs> regs{};
@@ -91,6 +92,10 @@ namespace OS {
             }
 
             [[nodiscard]] std::vector<uint16_t> codigo_processo1() const {
+                return codigo_processo;
+            }
+
+            [[nodiscard]] const std::vector<uint16_t>& get_codigo_processo() const {
                 return codigo_processo;
             }
 
@@ -178,8 +183,6 @@ namespace OS {
             void restaurar_contexto(Arch::Cpu* cpu) const;
 
             Process(uint16_t pid, const std::string &name, const std::vector<uint16_t> &codigo_processo);
-
-            ~Process();
 
             uint16_t get_regs(uint16_t number) const;
 

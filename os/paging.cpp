@@ -19,16 +19,23 @@ namespace OS {
     uint16_t paginas_em_uso;
 
     Paging::Paging() : prox_pag_livre(0), paginas_em_uso(0) {
-        // paginas todas livres
-        paginas_livres.set(0, PAGINAS_TOTAIS, 1);
+        paginas_livres.resize(PAGINAS_TOTAIS, true);
         prox_pag_livre = 0;
     }
 
     uint16_t Paging::aloca_pagina_fisica_livre() {
-        // procurandou
+        for (uint16_t i = prox_pag_livre; i < PAGINAS_TOTAIS; i++) {
+            if (paginas_livres[i]) {
+                paginas_livres[i] = false;
+                paginas_em_uso++;
+                prox_pag_livre = i + 1;
+                return i;
+            }
+        }
+
         for (uint16_t i = 0; i < prox_pag_livre; i++) {
             if (paginas_livres[i]) {
-                paginas_livres[i] = 0;
+                paginas_livres[i] = false;
                 paginas_em_uso++;
                 prox_pag_livre = i + 1;
                 return i;
@@ -79,6 +86,7 @@ namespace OS {
 
         if (!tabela_paginas || mapeamento_passa_limite_tabela) return false;
 
+
         for (uint16_t i = 0; i < numero_paginas; i++) {
             uint16_t indice_memoria_virtual = comeco_vmem_pagina + i;
             (*tabela_paginas)[indice_memoria_virtual] = 0; // "alocação de memória só será efetivada no primeiro acesso."
@@ -95,7 +103,7 @@ namespace OS {
         return true;
     }
 
-    void Paging::libera_paginas_fisicas(Arch::Cpu::PageTable* tabela_do_processo, uint16_t tamanho) {
+    void Paging::libera_paginas_fisicas(Arch::Cpu::PageTable* tabela_do_processo) {
         if (!tabela_do_processo) return;
 
         for (uint16_t i = 0; i < Config::ptes_per_table; i++) {
@@ -110,19 +118,52 @@ namespace OS {
         }
     }
 
+    void Paging::carregar_codigo_pra_pagina(uint16_t pagina_memoria, uint16_t endereco_fisico, Arch::Cpu *cpuglobal, Process *processo_do_momento) {
+        const std::vector<uint16_t>& codigo = processo_do_momento->get_codigo_processo();
+
+        for (uint16_t i = 0; i < Config::page_size; i++) {
+            terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "carregando codigo..", i);
+            uint16_t offset = pagina_memoria * Config::page_size + i;
+            uint16_t valor;
+
+            if (offset < codigo.size()) valor = codigo[offset];
+            else valor = 0;
+            cpuglobal->pmem_write(endereco_fisico + i, valor);
+        }
+    }
+
+    bool Paging::verificar_violacao_protecao(Arch::Cpu::PageTableEntry& entrada, Arch::Cpu::CpuException::Type codigo_erro) {
+        if (entrada[Arch::Cpu::PteField::Present] != 1) {
+            return false;
+        }
+
+        switch (codigo_erro) {
+            case Arch::Cpu::CpuException::Type::VmemGPFnotReadable:
+                return entrada[Arch::Cpu::PteField::Readable] == 0;
+            case Arch::Cpu::CpuException::Type::VmemGPFnotWritable:
+                return entrada[Arch::Cpu::PteField::Writable] == 0;
+            case Arch::Cpu::CpuException::Type::VmemGPFnotExecutable:
+                return entrada[Arch::Cpu::PteField::Executable] == 0;
+            default:
+                return false;
+        }
+    }
+
     ResultadoAlocarPagina Paging::page_fault(uint16_t endereco, Arch::Cpu::CpuException::Type codigo_erro, Arch::Cpu* cpuglobal, Process* processo_do_momento) {
         uint16_t pagina_memoria_virtual = endereco >> Config::page_size_bits; /// kkkkk divisao não pode pqp its over
+        terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "chamando page fault");
 
         Arch::Cpu::PageTable* tabela = processo_do_momento->get_tabela_paginas();
 
         Arch::Cpu::PageTableEntry& entrada = (*tabela)[pagina_memoria_virtual];
         bool valida_mas_nao_presente = entrada[Arch::Cpu::PteField::Foo] == 1 && entrada[Arch::Cpu::PteField::Present] == 0;
         bool acesso_incorreto = entrada[Arch::Cpu::PteField::Foo] == 0;
-        bool acesso_violante = entrada[Arch::Cpu::PteField::Present] == 1;
+        bool violante = verificar_violacao_protecao(entrada, codigo_erro);
 
         if (valida_mas_nao_presente) {
             terminal_println(cpuglobal, Terminal::Kernel, "demanda paging ok");
             uint16_t pagina_finsica = aloca_pagina_fisica_livre();
+            terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada no endereco: ", pagina_finsica);
 
             if (pagina_finsica == DEU_RUIM_ALOCAR_PAGINA) {
                 terminal_println(cpuglobal, Terminal::Kernel, "DEU RUIM ALOCAR PÁGINA");
@@ -135,9 +176,7 @@ namespace OS {
 
             uint16_t endereco_fisico = pagina_finsica * Config::page_size;
 
-            for (uint16_t i = 0; i < Config::page_size; i++) {
-                cpuglobal->pmem_write(endereco_fisico + 1, 0);
-            }
+            carregar_codigo_pra_pagina(pagina_memoria_virtual, endereco_fisico, cpuglobal, processo_do_momento);
 
             terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada no endereco: " + endereco_fisico);
             return ResultadoAlocarPagina::deu_bom;
@@ -145,7 +184,7 @@ namespace OS {
         if (acesso_incorreto) {
             return ResultadoAlocarPagina::acesso_invalido;
         }
-        if (acesso_violante) {
+        if (violante) {
             terminal_println(cpuglobal, Terminal::Kernel, "acesso_violante");
 
             switch (codigo_erro) {
@@ -157,8 +196,6 @@ namespace OS {
                     break;
                 case Arch::Cpu::CpuException::Type::VmemGPFnotExecutable:
                     terminal_println(cpuglobal, Terminal::Kernel, "VmemGPFnotExecutable");
-                    break;
-                default:
                     break;
             }
 
@@ -205,18 +242,16 @@ namespace OS {
         uint16_t pags_consec = 0;
         pagina_inicial = 0;
 
+
         for (uint16_t i = 0; i < Config::ptes_per_table; i++) {
-            // meu foo significa se ta livre ou nn
             if ((*tabela)[i][Arch::Cpu::PteField::Foo] == 0) {
+                if (pags_consec == 0) pagina_inicial = i;
+
                 pags_consec++;
+                if (pags_consec >= paginas_necessarias) return true;
 
-                if (pags_consec == 1) pagina_inicial = 1;
-                terminal_println(cpuglobal, Terminal::Kernel, "encontrou esp consec: ");
-                if (pags_consec > paginas_necessarias) return true;
             }
-
-            terminal_println(cpuglobal, Terminal::Kernel, "ainda não encontrou: ");
-            if (pags_consec > 0) pags_consec = 0;
+            else pags_consec = 0;
         }
 
         terminal_println(cpuglobal, Terminal::Kernel, "retornou false ao encontrar espaço consecutivo: ");

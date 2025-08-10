@@ -47,10 +47,7 @@ namespace OS {
             cpu->set_gpr(i, regs[i]);
         }
 
-
-        cpu->set_vmem_mode(Arch::Cpu::VmemMode::BaseLimit);
-        cpu->set_vmem_paddr_base(base);
-        cpu->set_vmem_size(limite);
+        cpu->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
     }
 }
 

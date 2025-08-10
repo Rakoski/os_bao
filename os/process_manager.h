@@ -20,10 +20,7 @@ namespace OS {
 
         Process* get_process();
         
-        void handle_exception(const Arch::Cpu::CpuException& exception);
     };
-
-    extern ProcessManager* process_manager;
 }
 
 #endif

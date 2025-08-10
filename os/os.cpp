@@ -40,14 +40,17 @@ void aloca_pagina_fisica(Process* novo_processo) {
         uint16_t endereco_fisico = nova_pagina * Config::page_size;
 
         for (uint16_t i = 0; i < Config::page_size; i++) {
-            cpuglobal->pmem_write(endereco_fisico + 1, 0);
+            terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada com valor 0: " + endereco_fisico + 1);
+            cpuglobal->pmem_write(endereco_fisico + i, 0);
         }
-       terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada DE COMEÇO no endereco: " + endereco_fisico);
-    }
 
+        terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada DE COMEÇO no endereco: " + endereco_fisico);
+    }
 }
 
-Process* criar_e_configurar_processo(const std::string& filename, const std::vector<uint16_t>& codigo) {
+Process* criar_e_configurar_processo(const std::string& filename) {
+    std::vector<uint16_t> codigo = Lib::load_from_disk_to_16bit_buffer(filename);
+
     uint16_t pid = proximo_pid++;
 
     Process* novo_processo = new Process(pid, filename, codigo);
@@ -71,13 +74,6 @@ Process* criar_e_configurar_processo(const std::string& filename, const std::vec
     return novo_processo;
 }
 
-std::vector<uint16_t> carregar_codigo_do_arquivo(const std::string& filename) {
-    terminal_println(cpuglobal, Arch::Terminal::Type::App, "ta rodando: ", filename);
-    std::vector<uint16_t> codigo = Lib::load_from_disk_to_16bit_buffer(filename);
-    terminal_println(cpuglobal, Arch::Terminal::Type::App, "ta rodando 2: ", filename);
-    return codigo;
-}
-
 void run_process() {
     if (!processo_rodando_no_momento) return;
 
@@ -85,9 +81,8 @@ void run_process() {
     processo_rodando_no_momento->set_estado(ProcessState::running);
 
     auto processo = std::find(processos_rodando.begin(), processos_rodando.end(), processo_rodando_no_momento);
-    if (processo == processos_rodando.end()) {
-        processos_rodando.push_back(processo_rodando_no_momento);
-    }
+
+    if (processo == processos_rodando.end()) processos_rodando.push_back(processo_rodando_no_momento);
 }
 
 
@@ -101,7 +96,6 @@ void rerodar_idle() {
         cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
         cpuglobal->set_page_table(idle->get_tabela_paginas());
 
-        processo_rodando_no_momento->protege(cpuglobal);
         processo_rodando_no_momento->restaurar_contexto(cpuglobal);
         terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "vontado pro processo: ", processo_rodando_no_momento->get_name());
     }
@@ -117,7 +111,7 @@ void free_processo() {
     if (idle) {
         processo_rodando_no_momento = idle;
         processo_rodando_no_momento->set_estado(ProcessState::running);
-        cpuglobal->set_vmem_mode(Arch::Cpu::Paging);
+        cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
         processo_rodando_no_momento->restaurar_contexto(cpuglobal);
     } else {
         processo_rodando_no_momento = nullptr;
@@ -154,7 +148,7 @@ void processar_comandos(std::string comando, std::vector<std::string> args) {
         Utils::printar_help();
     }
     else {
-        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "Digite 'help' para ver os comandos disponíveis");
+        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "Digite 'help'    para ver os comandos disponíveis");
     }
 }
 
@@ -187,26 +181,50 @@ void process_command(const std::string& palavra) {
 
 void tratar_excecao() {
     const auto& exception = cpuglobal->get_ref_cpu_exception();
-    terminal_println(cpuglobal, Terminal::Kernel, "excesao brabissima\n", exception.type, "\nno endereço: \n", exception.vaddr);
+    terminal_println(cpuglobal, Terminal::Kernel, "excecao das braba: ", exception.type, " no endereço: ", exception.vaddr);
 
     if (!processo_rodando_no_momento) return;
 
     if (exception.type == Arch::Cpu::CpuException::Type::VmemPageFault) {
-        paginacao->page_fault(exception.vaddr, exception.type, cpuglobal, processo_rodando_no_momento);
+        auto resultado = paginacao->page_fault(exception.vaddr, exception.type, cpuglobal, processo_rodando_no_momento);
+
+        if (resultado == ResultadoAlocarPagina::deu_bom) {
+            return;
+        }
+        terminal_println(cpuglobal, Terminal::Kernel, "page fault deu ruim");
+        if (resultado == ResultadoAlocarPagina::erro_processo_ou_na_tabela && processo_rodando_no_momento->get_name() != "idle.bin") {
+            terminal_println(cpuglobal, Terminal::Kernel, "matando processo:  ",  processo_rodando_no_momento->get_name());
+            kill_process();
+        }
+        return;
     }
 
-    if (processo_rodando_no_momento->get_name() == "idle.bin") {
-        terminal_println(cpuglobal, Terminal::Kernel, "Exceção no processo idle, reiniciando...");
-        auto it = std::find(processos_rodando.begin(), processos_rodando.end(), processo_rodando_no_momento);
-        if (it != processos_rodando.end()) {
-            processos_rodando.erase(it);
-        }
-        free_processo();
-        load_program("idle.bin");
-    } else {
-        terminal_println(cpuglobal, Terminal::Kernel, "MATANDO O PROCESSO!!!!!! dale excessao nele");
+    if (exception.type == Arch::Cpu::CpuException::Type::VmemGPFnotReadable ||
+        exception.type == Arch::Cpu::CpuException::Type::VmemGPFnotWritable ||
+        exception.type == Arch::Cpu::CpuException::Type::VmemGPFnotExecutable) {
+        terminal_println(cpuglobal, Terminal::Kernel, "MATANDO EL PROCESSINHO");
         kill_process();
+        return;
     }
+
+    if (exception.type == Arch::Cpu::CpuException::Type::GPFinvalidInstruction) {
+        if (processo_rodando_no_momento->get_name() == "idle.bin") {
+            terminal_println(cpuglobal, Terminal::Kernel, "GPFinvalidInstruction, RELODANDO IDLE...");
+            auto it = std::find(processos_rodando.begin(), processos_rodando.end(), processo_rodando_no_momento);
+            if (it != processos_rodando.end()) {
+                processos_rodando.erase(it);
+            }
+            free_processo();
+            load_program("idle.bin");
+        } else {
+            terminal_println(cpuglobal, Terminal::Kernel, "matando el processo por conta da GPFinvalidInstruction");
+            kill_process();
+        }
+        return;
+    }
+
+    terminal_println(cpuglobal, Terminal::Kernel, "Unhandled exception, killing process");
+    kill_process();
 }
 
 void tratar_interrupcao_teclado() {
@@ -239,9 +257,9 @@ void syscall_0_fechar_processo() {
     }
 
     free_processo();
-    if (!processos_rodando.empty()) {
-        rerodar_idle();
-    }
+    // if (!processos_rodando.empty()) {
+    //     rerodar_idle();
+    // }
 }
 
 void syscall_1_imprimir_string() {
@@ -272,7 +290,7 @@ void syscall_4_alocar_memoria() {
         return;
     }
 
-    paging->aloca_dinamicamente(cpuglobal)
+    paging->aloca_dinamicamente(cpuglobal, processo_rodando_no_momento->codigo_processo.size(), processo_rodando_no_momento);
 }
 
 
@@ -291,9 +309,7 @@ bool load_program(const std::string& filename) {
     }
 
     try {
-        std::vector<uint16_t> codigo = carregar_codigo_do_arquivo(filename);
-
-        Process* processo = criar_e_configurar_processo(filename, codigo);
+        Process* processo = criar_e_configurar_processo(filename);
         if (!processo) return false;
 
         run_process();
