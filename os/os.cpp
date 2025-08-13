@@ -281,15 +281,59 @@ void printa_menu(Arch::Cpu *cpu) {
     terminal_print(cpu, Arch::Terminal::Type::Command, ">");
 }
 
-void syscall_4_alocar_memoria() {
 
+    void syscall_4_alocar_memoria() {
     if (!processo_rodando_no_momento) {
         cpuglobal->set_gpr(1, 0);
-        terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "falha ao alocar memória dinamicamente");
+        terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "falha ao alocar memória dinamicamente pois nenhum processo rodando");
         return;
     }
 
-    paging->aloca_dinamicamente(cpuglobal, processo_rodando_no_momento->codigo_processo.size(), processo_rodando_no_momento);
+    uint16_t tamanho_solicitado = cpuglobal->get_gpr(1);
+
+    if (tamanho_solicitado == 0) {
+        cpuglobal->set_gpr(1, 0);
+        terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "falha ao alocar memória dinamicamente pois  tamanho inválido");
+        return;
+    }
+
+    uint16_t endereco_virtual = paginacao->aloca_dinamicamente(cpuglobal, tamanho_solicitado, processo_rodando_no_momento);
+
+    if (endereco_virtual == -1) {
+        // se der errado - gpr 1 com resultado 0
+        cpuglobal->set_gpr(1, 0);
+        terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "falha ao alocar memória dinamicamente");
+    } else {
+        // se der bom:
+        // 1 - coloca r1 com resultado 1 (sucesso)
+        // 2 - coloca r2 com endereço da memória virtual
+        cpuglobal->set_gpr(1, 1);
+        cpuglobal->set_gpr(2, endereco_virtual);
+        terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "memória alocadaaaaa: ", endereco_virtual);
+    }
+}
+
+
+void syscall_5_desalocar_memoria() {
+    if (!processo_rodando_no_momento) {
+        cpuglobal->set_gpr(1, 0);
+        terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "falha ao desalocar memória possi nenhum processo rodando");
+        return;
+    }
+
+    uint16_t endereco_para_desalocar = cpuglobal->get_gpr(1);
+
+    bool deu_bom = paginacao->desaloca_a_partir_de_tal_endereco(cpuglobal, endereco_para_desalocar, processo_rodando_no_momento);
+
+    if (deu_bom) {
+        //gpr 1 seta 1
+        cpuglobal->set_gpr(1, 1);
+        terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "memória desalocada com sucesso do endereço: ", endereco_para_desalocar);
+    } else {
+        //seta gpr 0 no r1
+        cpuglobal->set_gpr(1, 0);
+        terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "falha ao desalocar memória do endereço: ", endereco_para_desalocar);
+    }
 }
 
 
@@ -360,10 +404,22 @@ void syscall() {
         break;
 
         case 3: {
-            uint16_t value = cpuglobal->get_gpr(1);
-            terminal_print(cpuglobal, Arch::Terminal::Type::App, value);
+            uint16_t gpr = cpuglobal->get_gpr(1);
+            terminal_print(cpuglobal, Arch::Terminal::Type::App, gpr);
             break;
         }
+
+        case 4: {
+            syscall_4_alocar_memoria();
+            break;
+        }
+
+        case 5: {
+            syscall_5_desalocar_memoria();
+            break;
+        }
+
+
 
         default:
             terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "kakakka q porra de cod syscall é esse vei: ", cod_syscall);

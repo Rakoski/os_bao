@@ -49,6 +49,15 @@ namespace OS {
 
         cpu->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
     }
+
+    void Process::colocar_alocacao(uint16_t endereco, uint16_t numero_pag, uint16_t tamanho_words) {
+        alocacoes.insert({endereco, AreaMemoriaVirtual(endereco, numero_pag, tamanho_words)});
+    }
+
+    AreaMemoriaVirtual* Process::obter_alocacao(uint16_t endereco) {
+        auto it = alocacoes.find(endereco);
+        return (it != alocacoes.end()) ? &it->second : nullptr;
+    }
 }
 
 #endif // __SO_BAO_HEADER_PROCESS_MANAGER_H__

@@ -69,6 +69,8 @@ namespace OS {
         void carregar_codigo_pra_pagina(uint16_t pagina_memoria, uint16_t endereco_fisico, Arch::Cpu* cpuglobal, Process* processo_do_momento);
 
         bool verificar_violacao_protecao(Arch::Cpu::PageTableEntry& entrada, Arch::Cpu::CpuException::Type codigo_erro);
+
+        bool desaloca_a_partir_de_tal_endereco(Arch::Cpu* cpuglobal, uint16_t endereco, Process* processo);
     };
 
     extern Paging* paging;

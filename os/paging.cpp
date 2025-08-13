@@ -163,7 +163,7 @@ namespace OS {
         if (valida_mas_nao_presente) {
             terminal_println(cpuglobal, Terminal::Kernel, "demanda paging ok");
             uint16_t pagina_finsica = aloca_pagina_fisica_livre();
-            terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada no endereco: ", pagina_finsica);
+            terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada: " + pagina_finsica);
 
             if (pagina_finsica == DEU_RUIM_ALOCAR_PAGINA) {
                 terminal_println(cpuglobal, Terminal::Kernel, "DEU RUIM ALOCAR PÁGINA");
@@ -176,9 +176,10 @@ namespace OS {
 
             uint16_t endereco_fisico = pagina_finsica * Config::page_size;
 
+            terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada no endereco: " + endereco_fisico);
+
             carregar_codigo_pra_pagina(pagina_memoria_virtual, endereco_fisico, cpuglobal, processo_do_momento);
 
-            terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada no endereco: " + endereco_fisico);
             return ResultadoAlocarPagina::deu_bom;
         }
         if (acesso_incorreto) {
@@ -234,6 +235,22 @@ namespace OS {
 
         uint16_t endereco_virtual = pagina_inicial * Config::page_size;
 
+        processo->colocar_alocacao(endereco_virtual, paginas_necessarias, tamanho_solicitado);
+
+        // alocar
+        // 1 - se der bom coloca r1 com resultado 1
+        // 2 - se der bom r2 resultado mem virtual
+
+        // se der errado
+        // gpr 1 com resultado 0
+
+        // desalocar
+        // lembrar de desalocar todo o espaco consecutivo que foi alocado no 4
+        // 1 se desalocar
+        // 2 se nao desalocar
+
+        // guardar a informacao de quanto foi alocado a partir de tal endereço
+
         return endereco_virtual;
     }
 
@@ -257,6 +274,36 @@ namespace OS {
         terminal_println(cpuglobal, Terminal::Kernel, "retornou false ao encontrar espaço consecutivo: ");
         return false;
     }
+
+    bool Paging::desaloca_a_partir_de_tal_endereco(Arch::Cpu* cpuglobal, uint16_t endereco, Process* processo) {
+        AreaMemoriaVirtual* alocacao_area = processo->obter_alocacao(endereco);
+
+        if (!alocacao_area) {
+            terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "kk não tem área q alocou");
+            return false;
+        }
+
+        Arch::Cpu::PageTable* tabela = processo->get_tabela_paginas();
+        uint16_t pagina_inicial = endereco / Config::page_size;
+
+        for (uint16_t i = 0; i < alocacao_area->numero_pag; i++) {
+            uint16_t pagina_atual = pagina_inicial + i;
+
+            if (pagina_atual < Config::ptes_per_table) {
+                Arch::Cpu::PageTableEntry& entrada = (*tabela)[pagina_atual];
+
+                if (entrada[Arch::Cpu::PteField::Present] == 1) {
+                    uint16_t pagina_fisica = entrada[Arch::Cpu::PteField::PhyFrameID];
+                    libera_pagina(pagina_fisica);
+                }
+
+                entrada = 0;
+            }
+        }
+
+        return processo->alocacoes.erase(endereco);
+    }
+
 
 
 
