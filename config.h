@@ -23,13 +23,13 @@ namespace Config {
 
     inline constexpr uint32_t virtual_mem_size = 1 << virtual_mem_size_bits;
 
-    inline constexpr uint32_t page_size_bits = 4;
+    inline constexpr uint32_t page_size_bits = 4; // 4 bits p offset
 
-    inline constexpr uint16_t page_size = 1 << page_size_bits;
+    inline constexpr uint16_t page_size = 1 << page_size_bits; // cada página tem 16 words
 
     inline constexpr uint32_t page_frame_id_bits = virtual_mem_size_bits - page_size_bits;
 
-    inline constexpr uint16_t ptes_per_table = 1 << page_frame_id_bits;
+    inline constexpr uint16_t ptes_per_table = 1 << page_frame_id_bits; // 4096 paginas VIRTUAIS possíveis
 
     inline constexpr uint16_t ptes_flag_bits = page_size_bits;
 

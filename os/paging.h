@@ -7,17 +7,42 @@
 
 #include <cstdint>
 #include <memory>
+#include <iostream>
 
+#include "process.h"
 #include "../config.h"
 #include "../arch/arch.h"
-#include "my-lib/bit.h"
 
 namespace OS {
+    enum class ResultadoAlocarPagina {
+        deu_bom,
+        acesso_invalido,
+        acesso_violante,
+        erro_processo_ou_na_tabela
+    };
+
+    // tava dando erro no compilador ao imprimir o resultado se deu bom ou nao quando vou alocar alguma página
+    inline const char* enum_class_to_str(const ResultadoAlocarPagina value) {
+        static constexpr auto strs = std::to_array<const char*>({
+            "deu_bom",
+            "acesso_invalido",
+            "acesso_violante",
+            "erro_processo_ou_na_tabela"
+        });
+
+        mylib_assert_exception_msg(std::to_underlying(value) < strs.size(), "invalid value ", std::to_underlying(value))
+
+        return strs[std::to_underlying(value)];
+    }
+
     class Paging {
+
+    private:
+        bool encontrar_espaco_consecutivo_pras_pags(Arch::Cpu::PageTable* tabela, uint16_t paginas_necessarias, uint16_t &pagina_inicial, Arch::Cpu* cpuglobal);
 
     public:
 
-        Mylib::BitSet<Config::phys_mem_size_words / Config::page_size> paginas_livres;
+        std::vector<bool> paginas_livres;
         uint16_t prox_pag_livre;
         uint16_t PAGINAS_TOTAIS = Config::phys_mem_size_words / Config::page_size;
         uint16_t paginas_em_uso;
@@ -37,7 +62,15 @@ namespace OS {
 
         void libera_paginas_fisicas(Arch::Cpu::PageTable* tabela);
 
-        void page_fault(uint16_t endereco, uint16_t codigo_erro);
+        ResultadoAlocarPagina page_fault(uint16_t endereco, Arch::Cpu::CpuException::Type codigo_erro, Arch::Cpu* cpuglobal, Process* processo_do_momento);
+
+        uint16_t aloca_dinamicamente(Arch::Cpu* cpuglobal, uint16_t tamanho_words, Process* processo);
+
+        void carregar_codigo_pra_pagina(uint16_t pagina_memoria, uint16_t endereco_fisico, Arch::Cpu* cpuglobal, Process* processo_do_momento);
+
+        bool verificar_violacao_protecao(Arch::Cpu::PageTableEntry& entrada, Arch::Cpu::CpuException::Type codigo_erro);
+
+        bool desaloca_a_partir_de_tal_endereco(Arch::Cpu* cpuglobal, uint16_t endereco, Process* processo);
     };
 
     extern Paging* paging;

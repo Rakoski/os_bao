@@ -3,6 +3,8 @@
 //
 
 #include "paging.h"
+#include <cmath>
+#include "os-lib.h"
 #include "os.h"
 #include "process.h"
 #include "process_manager.h"
@@ -12,17 +14,28 @@ namespace OS {
     Paging* paging = nullptr;
     uint16_t DEU_RUIM_ALOCAR_PAGINA = -1;
 
+    std::vector<bool> paginas_livres;
+    uint16_t prox_pag_livre;
+    uint16_t paginas_em_uso;
+
     Paging::Paging() : prox_pag_livre(0), paginas_em_uso(0) {
-        // paginas todas livres
-        paginas_livres.set(0, PAGINAS_TOTAIS, 1);
+        paginas_livres.resize(PAGINAS_TOTAIS, true);
         prox_pag_livre = 0;
     }
 
     uint16_t Paging::aloca_pagina_fisica_livre() {
-        // procurandou
+        for (uint16_t i = prox_pag_livre; i < PAGINAS_TOTAIS; i++) {
+            if (paginas_livres[i]) {
+                paginas_livres[i] = false;
+                paginas_em_uso++;
+                prox_pag_livre = i + 1;
+                return i;
+            }
+        }
+
         for (uint16_t i = 0; i < prox_pag_livre; i++) {
             if (paginas_livres[i]) {
-                paginas_livres[i] = 0;
+                paginas_livres[i] = false;
                 paginas_em_uso++;
                 prox_pag_livre = i + 1;
                 return i;
@@ -73,8 +86,6 @@ namespace OS {
 
         if (!tabela_paginas || mapeamento_passa_limite_tabela) return false;
 
-        std::vector<uint16_t> paginas_vao_ser_alocadas;
-        paginas_vao_ser_alocadas.reserve(numero_paginas);
 
         for (uint16_t i = 0; i < numero_paginas; i++) {
             uint16_t indice_memoria_virtual = comeco_vmem_pagina + i;
@@ -102,26 +113,200 @@ namespace OS {
             if (entrada[Arch::Cpu::PteField::Present] == 1) {
                 uint16_t pagina_fisica = entrada[Arch::Cpu::PteField::PhyFrameID];
                 libera_pagina(pagina_fisica);
-                entrada = 0;
             }
+            entrada = 0;
         }
     }
 
-    Arch::Cpu::PageTable* get_tabela_processo() {
-        extern ProcessManager* gerenciador;
-        if (!gerenciador)
+    void Paging::carregar_codigo_pra_pagina(uint16_t pagina_memoria, uint16_t endereco_fisico, Arch::Cpu *cpuglobal, Process *processo_do_momento) {
+        const std::vector<uint16_t>& codigo = processo_do_momento->get_codigo_processo();
 
-        Process* processo = gerenciador->get_current_process();
+        for (uint16_t i = 0; i < Config::page_size; i++) {
+            terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "carregando codigo..", i);
+            uint16_t offset = pagina_memoria * Config::page_size + i;
+            uint16_t valor;
 
-        if (!processo) return nullptr;
-        return processo->get_tabela_paginas();
+            if (offset < codigo.size()) valor = codigo[offset];
+            else valor = 0;
+            cpuglobal->pmem_write(endereco_fisico + i, valor);
+        }
     }
 
-    void Paging::page_fault(uint16_t endereco, uint16_t codigo_erro) {
-        uint16_t pagina_memoria_virtual = endereco >> Config::page_size; /// kkkkk divisao não pode pqp its over
+    bool Paging::verificar_violacao_protecao(Arch::Cpu::PageTableEntry& entrada, Arch::Cpu::CpuException::Type codigo_erro) {
+        if (entrada[Arch::Cpu::PteField::Present] != 1) {
+            return false;
+        }
 
-        Arch::Cpu::PageTable* tabela =
-
+        switch (codigo_erro) {
+            case Arch::Cpu::CpuException::Type::VmemGPFnotReadable:
+                return entrada[Arch::Cpu::PteField::Readable] == 0;
+            case Arch::Cpu::CpuException::Type::VmemGPFnotWritable:
+                return entrada[Arch::Cpu::PteField::Writable] == 0;
+            case Arch::Cpu::CpuException::Type::VmemGPFnotExecutable:
+                return entrada[Arch::Cpu::PteField::Executable] == 0;
+            default:
+                return false;
+        }
     }
+
+    ResultadoAlocarPagina Paging::page_fault(uint16_t endereco, Arch::Cpu::CpuException::Type codigo_erro, Arch::Cpu* cpuglobal, Process* processo_do_momento) {
+        uint16_t pagina_memoria_virtual = endereco >> Config::page_size_bits; /// kkkkk divisao não pode pqp its over
+        terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "chamando page fault pro processo: ", processo_do_momento->get_name());
+
+        Arch::Cpu::PageTable* tabela = processo_do_momento->get_tabela_paginas();
+
+        Arch::Cpu::PageTableEntry& entrada = (*tabela)[pagina_memoria_virtual];
+        bool valida_mas_nao_presente = entrada[Arch::Cpu::PteField::Foo] == 1 && entrada[Arch::Cpu::PteField::Present] == 0;
+        bool acesso_incorreto = entrada[Arch::Cpu::PteField::Foo] == 0;
+        bool violante = verificar_violacao_protecao(entrada, codigo_erro);
+
+        if (valida_mas_nao_presente) {
+            terminal_println(cpuglobal, Terminal::Kernel, "demanda paging ok");
+            uint16_t pagina_finsica = aloca_pagina_fisica_livre();
+            terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada: " + pagina_finsica);
+
+            if (pagina_finsica == DEU_RUIM_ALOCAR_PAGINA) {
+                terminal_println(cpuglobal, Terminal::Kernel, "DEU RUIM ALOCAR PÁGINA");
+                return ResultadoAlocarPagina::erro_processo_ou_na_tabela;
+            }
+
+            entrada[Arch::Cpu::PteField::PhyFrameID] = pagina_finsica;
+            entrada[Arch::Cpu::PteField::Present] = 1;
+            entrada[Arch::Cpu::PteField::Accessed] = 1;
+
+            uint16_t endereco_fisico = pagina_finsica * Config::page_size;
+
+            terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada no endereco: " + endereco_fisico);
+
+            carregar_codigo_pra_pagina(pagina_memoria_virtual, endereco_fisico, cpuglobal, processo_do_momento);
+
+            return ResultadoAlocarPagina::deu_bom;
+        }
+        if (acesso_incorreto) {
+            return ResultadoAlocarPagina::acesso_invalido;
+        }
+        if (violante) {
+            terminal_println(cpuglobal, Terminal::Kernel, "acesso_violante");
+
+            switch (codigo_erro) {
+                case Arch::Cpu::CpuException::Type::VmemGPFnotReadable:
+                    terminal_println(cpuglobal, Terminal::Kernel, "VmemGPFnotReadable");
+                    break;
+                case Arch::Cpu::CpuException::Type::VmemGPFnotWritable:
+                    terminal_println(cpuglobal, Terminal::Kernel, "VmemGPFnotWritable");
+                    break;
+                case Arch::Cpu::CpuException::Type::VmemGPFnotExecutable:
+                    terminal_println(cpuglobal, Terminal::Kernel, "VmemGPFnotExecutable");
+                    break;
+            }
+
+            return ResultadoAlocarPagina::acesso_violante;
+        }
+        return ResultadoAlocarPagina::erro_processo_ou_na_tabela;
+    }
+
+    uint16_t Paging::aloca_dinamicamente(Arch::Cpu* cpuglobal, uint16_t tamanho_solicitado, Process *processo) {
+        Arch::Cpu::PageTable* tabela = processo->get_tabela_paginas();
+
+        // quantas paginas são necessárioas
+        // a conta - tanto de words (tipo 20) + configuração (16) - 1 / 16  (ceiling division) OU ceil(tanto de words / config)
+        // esse menos 1 pesquisei era tipo se vc tem 17 words e cada página tem 16 eu preciso de 2 páginas inteiras, não 1,0625 páginas
+        // perguntar isso pro prof nao entendi muito bem
+        uint16_t paginas_necessarias = std::ceil((double) (tamanho_solicitado) / Config::page_size);
+
+        uint16_t pagina_inicial = 0;
+        bool tem_espaco = encontrar_espaco_consecutivo_pras_pags(tabela, paginas_necessarias, pagina_inicial, cpuglobal);
+
+        if (!tem_espaco) {
+            terminal_println(cpuglobal, Terminal::Kernel, "não encontrou espaço p alocacao dinamica");
+            return DEU_RUIM_ALOCAR_PAGINA;
+        }
+
+        mapeia_paginas_pra_um_processo(tabela, pagina_inicial, paginas_necessarias, true, true, true); // area de dados nao pode executar? perguntar pro prof
+
+        // como calcular o endereço virtual é dividido em offset e numero
+        // Endereço físico 7 × 4096 + 742 = 29414 // do pdf
+        // TENHO UM ENDEREÇO E QUERO ACHAR A PÁGINA FÍSICA
+        // número_da_página = endereço_virtual / tamanho_da_página;
+        // offset = endereço_virtual % tamanho_da_página;
+
+        // TENHO A PÁGINA virtual - como as páginas são consecutivas na memória
+        // a página 3 -> sempre vai ser dos endereço 12288 ao 16383
+
+        uint16_t endereco_virtual = pagina_inicial * Config::page_size;
+
+        processo->colocar_alocacao(endereco_virtual, paginas_necessarias, tamanho_solicitado);
+
+        // alocar
+        // 1 - se der bom coloca r1 com resultado 1
+        // 2 - se der bom r2 resultado mem virtual
+
+        // se der errado
+        // gpr 1 com resultado 0
+
+        // desalocar
+        // lembrar de desalocar todo o espaco consecutivo que foi alocado no 4
+        // 1 se desalocar
+        // 2 se nao desalocar
+
+        // guardar a informacao de quanto foi alocado a partir de tal endereço
+
+        return endereco_virtual;
+    }
+
+    bool Paging::encontrar_espaco_consecutivo_pras_pags(Arch::Cpu::PageTable* tabela, uint16_t paginas_necessarias, uint16_t &pagina_inicial, Arch::Cpu* cpuglobal) {
+        terminal_println(cpuglobal, Terminal::Kernel, "encontrando espaço junto consec: ");
+        uint16_t pags_consec = 0;
+        pagina_inicial = 0;
+
+
+        for (uint16_t i = 0; i < Config::ptes_per_table; i++) {
+            if ((*tabela)[i][Arch::Cpu::PteField::Foo] == 0) {
+                if (pags_consec == 0) pagina_inicial = i;
+
+                pags_consec++;
+                if (pags_consec >= paginas_necessarias) return true;
+
+            }
+            else pags_consec = 0;
+        }
+
+        terminal_println(cpuglobal, Terminal::Kernel, "retornou false ao encontrar espaço consecutivo: ");
+        return false;
+    }
+
+    bool Paging::desaloca_a_partir_de_tal_endereco(Arch::Cpu* cpuglobal, uint16_t endereco, Process* processo) {
+        AreaMemoriaVirtual* alocacao_area = processo->obter_alocacao(endereco);
+
+        if (!alocacao_area) {
+            terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "kk não tem área q alocou");
+            return false;
+        }
+
+        Arch::Cpu::PageTable* tabela = processo->get_tabela_paginas();
+        uint16_t pagina_inicial = endereco / Config::page_size;
+
+        for (uint16_t i = 0; i < alocacao_area->numero_pag; i++) {
+            uint16_t pagina_atual = pagina_inicial + i;
+
+            if (pagina_atual < Config::ptes_per_table) {
+                Arch::Cpu::PageTableEntry& entrada = (*tabela)[pagina_atual];
+
+                if (entrada[Arch::Cpu::PteField::Present] == 1) {
+                    uint16_t pagina_fisica = entrada[Arch::Cpu::PteField::PhyFrameID];
+                    libera_pagina(pagina_fisica);
+                }
+
+                entrada = 0;
+            }
+        }
+
+        return processo->alocacoes.erase(endereco);
+    }
+
+
+
+
+
 
 }

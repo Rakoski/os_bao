@@ -6,6 +6,7 @@
 #define __SO_BAO_HEADER_PROCESS_H__
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -29,16 +30,24 @@ namespace OS {
        finished
     };
 
+    struct AreaMemoriaVirtual {
+        uint16_t endereco;
+        uint16_t numero_pag;
+        uint16_t tamanho_words;
+
+        AreaMemoriaVirtual(uint16_t endereco, uint16_t numero_pag, uint16_t tamanho_words) : endereco(endereco), numero_pag(numero_pag), tamanho_words(tamanho_words) {}
+    };
+
     class Process {
     public:
         uint16_t pid = 0;
         std::string name;
         ProcessState estado = ProcessState::ready;
-        uint16_t posicao = 0;
 
+        Process();
 
         uint16_t pc;
-        std::array<uint16_t, Config::nregs> regs{};
+        std::array<uint16_t, Config::nregs> regs;
 
         uint16_t base = 0;
 
@@ -49,6 +58,8 @@ namespace OS {
         std::vector<uint16_t> codigo_processo;
 
         Arch::Cpu::PageTable* tabela_paginas = nullptr;
+
+        std::map<uint16_t, AreaMemoriaVirtual> alocacoes;
 
         [[nodiscard]] uint16_t get_pid() const {
                 return pid;
@@ -91,6 +102,10 @@ namespace OS {
             }
 
             [[nodiscard]] std::vector<uint16_t> codigo_processo1() const {
+                return codigo_processo;
+            }
+
+            [[nodiscard]] const std::vector<uint16_t>& get_codigo_processo() const {
                 return codigo_processo;
             }
 
@@ -179,11 +194,13 @@ namespace OS {
 
             Process(uint16_t pid, const std::string &name, const std::vector<uint16_t> &codigo_processo);
 
-            ~Process();
-
             uint16_t get_regs(uint16_t number) const;
 
             void set_regs(uint16_t number, uint16_t value);
+
+        void colocar_alocacao(uint16_t endereco, uint16_t numero_pag, uint16_t tamanho_words);
+
+        AreaMemoriaVirtual* obter_alocacao(uint16_t endereco);
     };
 }
 

@@ -25,7 +25,7 @@ namespace OS {
 
     void Utils::exibir_info_processo(Process* processo) {
         terminal_println(cpuglobal, Terminal::Kernel, "processo ", processo->get_pid()," (", processo->get_name(), ") foi carregado\n");
-        terminal_println(cpuglobal, Terminal::Kernel, "base: ", processo->get_base(),", limite: ", processo->get_limite(), "\n");
+        terminal_println(cpuglobal, Terminal::Kernel, "tab pagina: ", processo->get_tabela_paginas());
     }
 
     Process* Utils::find_idle() {
