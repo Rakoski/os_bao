@@ -246,6 +246,27 @@ void tratar_interrupcao_teclado() {
     }
 }
 
+uint16_t vmem_to_phys(Arch::Cpu::PageTable& tabela, const uint16_t vaddr) {
+    uint16_t pagina_virtual = vaddr >> Config::page_size_bits;
+
+    Arch::Cpu::PageTableEntry& pte = tabela[pagina_virtual];
+
+    if (pte[Arch::Cpu::PteField::Present] == 0) {
+        return 0xFFFF;
+    }
+
+    uint16_t physical_frame = pte[Arch::Cpu::PteField::PhyFrameID];
+    uint16_t paddr = Mylib::set_bits(
+        vaddr,
+        Config::page_size_bits,
+        Config::page_frame_id_bits,
+        physical_frame
+    );
+
+    return paddr;
+}
+
+
 void syscall_0_fechar_processo() {
     terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "=( o processo pediu pra sair ----> tadinho <---");
     std::string process_name = processo_rodando_no_momento->get_name();
@@ -261,12 +282,19 @@ void syscall_0_fechar_processo() {
     }
 }
 
-void syscall_1_imprimir_string() {
+    void syscall_1_imprimir_string() {
     uint16_t str_addr = cpuglobal->get_gpr(1);
     std::string output;
     char caractere;
 
-    while ((caractere = (char)(cpuglobal->vmem_read(str_addr++))) != '\0') {
+    Arch::Cpu::PageTable* tabela = processo_rodando_no_momento->get_tabela_paginas();
+
+    while (true) {
+        uint16_t paddr = vmem_to_phys(*tabela, str_addr++);
+        if (paddr == 0xFFFF) break;
+
+        caractere = (char)(cpuglobal->pmem_read(paddr));
+        if (caractere == '\0') break;
         output += caractere;
     }
 
