@@ -103,6 +103,43 @@ namespace OS {
         return true;
     }
 
+    bool Paging::mapeia_e_carrega_codigo(Arch::Cpu::PageTable* tabela_paginas,
+                                     uint16_t comeco_vmem_pagina,
+                                     uint16_t numero_paginas,
+                                     const std::vector<uint16_t>& codigo,
+                                     Arch::Cpu* cpuglobal) {
+    bool mapeamento_passa_limite_tabela = comeco_vmem_pagina + numero_paginas > Config::ptes_per_table;
+
+    if (!tabela_paginas || mapeamento_passa_limite_tabela) return false;
+
+    for (uint16_t pagina_memoria = 0; pagina_memoria < numero_paginas; pagina_memoria++) {
+        uint16_t indice_memoria_virtual = comeco_vmem_pagina + pagina_memoria;
+
+        uint16_t pagina_fisica = aloca_pagina_fisica_livre();
+        if (pagina_fisica == DEU_RUIM_ALOCAR_PAGINA) {
+            for (uint16_t j = 0; j < pagina_memoria; j++) {
+                uint16_t pagina_para_liberar = (*tabela_paginas)[comeco_vmem_pagina + j][Arch::Cpu::PteField::PhyFrameID];
+                libera_pagina(pagina_para_liberar);
+                (*tabela_paginas)[comeco_vmem_pagina + j] = 0;
+            }
+            return false;
+        }
+
+        (*tabela_paginas)[indice_memoria_virtual] = 0;
+        (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Present] = 1;
+        (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::PhyFrameID] = pagina_fisica;
+        (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Readable] = 1;
+        (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Writable] = 0;
+        (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Executable] = 1;
+        (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Dirty] = 0;
+        (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Accessed] = 0;
+
+        uint16_t endereco_fisico = pagina_fisica * Config::page_size;
+        carregar_codigo_direto(pagina_memoria, endereco_fisico, cpuglobal, codigo);
+    }
+    return true;
+}
+
     void Paging::libera_paginas_fisicas(Arch::Cpu::PageTable* tabela_do_processo) {
         if (!tabela_do_processo) return;
 
@@ -118,17 +155,19 @@ namespace OS {
         }
     }
 
-    void Paging::carregar_codigo_pra_pagina(uint16_t pagina_memoria, uint16_t endereco_fisico, Arch::Cpu *cpuglobal, Process *processo_do_momento) {
-        const std::vector<uint16_t>& codigo = processo_do_momento->get_codigo_processo();
+    void Paging::carregar_codigo_direto(uint16_t pagina_virtual, uint16_t endereco_fisico,
+                                   Arch::Cpu *cpuglobal, const std::vector<uint16_t>& codigo) {
+        for (uint16_t i = 0; i < Config::page_size; i++) {
+            uint16_t offset = pagina_virtual * Config::page_size + i;
+            uint16_t valor = (offset < codigo.size()) ? codigo[offset] : 0;
+            cpuglobal->pmem_write(endereco_fisico + i, valor);
+        }
+    }
 
+    void Paging::carregar_pra_memoria(uint16_t endereco_fisico, Arch::Cpu *cpuglobal) {
         for (uint16_t i = 0; i < Config::page_size; i++) {
             terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "carregando codigo..", i);
-            uint16_t offset = pagina_memoria * Config::page_size + i;
-            uint16_t valor;
-
-            if (offset < codigo.size()) valor = codigo[offset];
-            else valor = 0;
-            cpuglobal->pmem_write(endereco_fisico + i, valor);
+            cpuglobal->pmem_write(endereco_fisico + i, 0);
         }
     }
 
@@ -178,7 +217,7 @@ namespace OS {
 
             terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada no endereco: " + endereco_fisico);
 
-            carregar_codigo_pra_pagina(pagina_memoria_virtual, endereco_fisico, cpuglobal, processo_do_momento);
+            carregar_pra_memoria(endereco_fisico, cpuglobal);
 
             return ResultadoAlocarPagina::deu_bom;
         }
@@ -222,7 +261,7 @@ namespace OS {
             return DEU_RUIM_ALOCAR_PAGINA;
         }
 
-        mapeia_paginas_pra_um_processo(tabela, pagina_inicial, paginas_necessarias, true, true, true); // area de dados nao pode executar? perguntar pro prof
+        mapeia_paginas_pra_um_processo(tabela, pagina_inicial, paginas_necessarias, true, true, false); // area de dados nao pode executar? perguntar pro prof
 
         // como calcular o endereço virtual é dividido em offset e numero
         // Endereço físico 7 × 4096 + 742 = 29414 // do pdf
@@ -261,7 +300,7 @@ namespace OS {
 
 
         for (uint16_t i = 0; i < Config::ptes_per_table; i++) {
-            if ((*tabela)[i][Arch::Cpu::PteField::Foo] == 0) {
+            if ((*tabela)[i][Arch::Cpu::PteField::Foo] == 0 && (*tabela)[i][Arch::Cpu::PteField::Present] == 0) {
                 if (pags_consec == 0) pagina_inicial = i;
 
                 pags_consec++;

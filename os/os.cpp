@@ -61,7 +61,7 @@ Process* criar_e_configurar_processo(const std::string& filename) {
     uint16_t tamanho_codigo = codigo.size();
     uint16_t paginas_necessarias = std::ceil((double)tamanho_codigo / Config::page_size);
 
-    bool sucesso = paginacao->mapeia_paginas_pra_um_processo(nova_tabela, 0, paginas_necessarias, true, true, true);
+    bool sucesso = paginacao->mapeia_e_carrega_codigo(nova_tabela, 0, paginas_necessarias, codigo, cpuglobal);
 
     if (!sucesso) {
         delete novo_processo;
@@ -282,7 +282,7 @@ void syscall_0_fechar_processo() {
     }
 }
 
-    void syscall_1_imprimir_string() {
+void syscall_1_imprimir_string() {
     uint16_t str_addr = cpuglobal->get_gpr(1);
     std::string output;
     char caractere;
@@ -310,7 +310,7 @@ void printa_menu(Arch::Cpu *cpu) {
 }
 
 
-    void syscall_4_alocar_memoria() {
+void syscall_4_alocar_memoria() {
     if (!processo_rodando_no_momento) {
         cpuglobal->set_gpr(1, 0);
         terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "falha ao alocar memória dinamicamente pois nenhum processo rodando");

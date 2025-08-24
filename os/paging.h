@@ -66,7 +66,11 @@ namespace OS {
 
         uint16_t aloca_dinamicamente(Arch::Cpu* cpuglobal, uint16_t tamanho_words, Process* processo);
 
-        void carregar_codigo_pra_pagina(uint16_t pagina_memoria, uint16_t endereco_fisico, Arch::Cpu* cpuglobal, Process* processo_do_momento);
+        void carregar_pra_memoria(uint16_t endereco_fisico, Arch::Cpu* cpuglobal);
+
+        bool mapeia_e_carrega_codigo(Arch::Cpu::PageTable* tabela_paginas, uint16_t comeco_vmem_pagina, uint16_t numero_paginas, const std::vector<uint16_t>& codigo, Arch::Cpu* cpuglobal);
+
+        void carregar_codigo_direto(uint16_t pagina_memoria, uint16_t endereco_fisico, Arch::Cpu* cpuglobal, const std::vector<uint16_t>& codigo);
 
         bool verificar_violacao_protecao(Arch::Cpu::PageTableEntry& entrada, Arch::Cpu::CpuException::Type codigo_erro);
 
