@@ -123,13 +123,6 @@ public:
 		this->write_io(std::to_underlying(port), value);
 	}
 
-
-	inline uint16_t vmem_read (const uint16_t vaddr)
-	{
-		const uint16_t paddr = this->vmem_to_phys(vaddr, MemAccessType::Read);
-		return this->pmem_read(paddr);
-	}
-
 	bool interrupt (const InterruptCode interrupt_code);
 	void force_interrupt (const InterruptCode interrupt_code);
 	void turn_off ();
@@ -143,6 +136,12 @@ private:
 	inline uint16_t vmem_read_instruction (const uint16_t vaddr)
 	{
 		const uint16_t paddr = this->vmem_to_phys(vaddr, MemAccessType::Execute);
+		return this->pmem_read(paddr);
+	}
+
+	inline uint16_t vmem_read (const uint16_t vaddr)
+	{
+		const uint16_t paddr = this->vmem_to_phys(vaddr, MemAccessType::Read);
 		return this->pmem_read(paddr);
 	}
 

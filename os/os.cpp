@@ -61,7 +61,7 @@ Process* criar_e_configurar_processo(const std::string& filename) {
     uint16_t tamanho_codigo = codigo.size();
     uint16_t paginas_necessarias = std::ceil((double)tamanho_codigo / Config::page_size);
 
-    bool sucesso = paginacao->mapeia_paginas_pra_um_processo(nova_tabela, 0, paginas_necessarias, true, true, true);
+    bool sucesso = paginacao->mapeia_e_carrega_codigo(nova_tabela, 0, paginas_necessarias, codigo, cpuglobal);
 
     if (!sucesso) {
         delete novo_processo;
@@ -246,6 +246,27 @@ void tratar_interrupcao_teclado() {
     }
 }
 
+uint16_t vmem_to_phys(Arch::Cpu::PageTable& tabela, const uint16_t vaddr) {
+    uint16_t pagina_virtual = vaddr >> Config::page_size_bits;
+
+    Arch::Cpu::PageTableEntry& pte = tabela[pagina_virtual];
+
+    if (pte[Arch::Cpu::PteField::Present] == 0) {
+        return 0xFFFF;
+    }
+
+    uint16_t physical_frame = pte[Arch::Cpu::PteField::PhyFrameID];
+    uint16_t paddr = Mylib::set_bits(
+        vaddr,
+        Config::page_size_bits,
+        Config::page_frame_id_bits,
+        physical_frame
+    );
+
+    return paddr;
+}
+
+
 void syscall_0_fechar_processo() {
     terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "=( o processo pediu pra sair ----> tadinho <---");
     std::string process_name = processo_rodando_no_momento->get_name();
@@ -266,7 +287,14 @@ void syscall_1_imprimir_string() {
     std::string output;
     char caractere;
 
-    while ((caractere = (char)(cpuglobal->vmem_read(str_addr++))) != '\0') {
+    Arch::Cpu::PageTable* tabela = processo_rodando_no_momento->get_tabela_paginas();
+
+    while (true) {
+        uint16_t paddr = vmem_to_phys(*tabela, str_addr++);
+        if (paddr == 0xFFFF) break;
+
+        caractere = (char)(cpuglobal->pmem_read(paddr));
+        if (caractere == '\0') break;
         output += caractere;
     }
 
@@ -282,7 +310,7 @@ void printa_menu(Arch::Cpu *cpu) {
 }
 
 
-    void syscall_4_alocar_memoria() {
+void syscall_4_alocar_memoria() {
     if (!processo_rodando_no_momento) {
         cpuglobal->set_gpr(1, 0);
         terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "falha ao alocar memória dinamicamente pois nenhum processo rodando");

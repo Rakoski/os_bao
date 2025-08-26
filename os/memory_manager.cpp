@@ -21,7 +21,6 @@ namespace OS {
             return false;
         }
 
-        process->set_base(prox_livre);
         process->set_limite(precisode);
 
         prox_livre += precisode;
@@ -31,14 +30,10 @@ namespace OS {
     void MemoryManager::free_memory(Process *process) {
         std::cout << "memoria foi freeada kk";
 
-        uint16_t base = process->get_base();
         uint16_t limite = process->get_limite();
 
         // o fim do endereço do processo é igual ao próximo endereço livre?
         // se for, é o processo alocado q eu quero -> posso pegar essa memória de volta
-        if (base + limite == prox_livre) {
-            prox_livre = base;
-        }
     }
 
     uint16_t MemoryManager::get_free_memory() const {

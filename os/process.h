@@ -49,8 +49,6 @@ namespace OS {
         uint16_t pc;
         std::array<uint16_t, Config::nregs> regs;
 
-        uint16_t base = 0;
-
         // pode ser tanto o tamanho quanto o final (eu fiz como tamanho)
         uint16_t limite = 0;
 
@@ -69,10 +67,6 @@ namespace OS {
                 return name;
             }
 
-            [[nodiscard]] uint16_t get_base() const {
-                return base;
-            }
-
             [[nodiscard]] uint16_t get_limite() const {
                 return limite;
             }
@@ -83,10 +77,6 @@ namespace OS {
 
             void set_name(const std::string_view &name) {
                 this->name = name;
-            }
-
-            void set_base(uint16_t base) {
-                this->base = base;
             }
 
             void set_limite(uint16_t limit) {
@@ -153,14 +143,6 @@ namespace OS {
                 this->regs = regs;
             }
 
-            [[nodiscard]] uint16_t base1() const {
-                return base;
-            }
-
-            void set_base1(uint16_t base) {
-                this->base = base;
-            }
-
             [[nodiscard]] std::vector<uint16_t> codigo_processo2() const {
                 return codigo_processo;
             }
@@ -181,7 +163,6 @@ namespace OS {
 
                 // n deixa acessar o end de cada um
                 cpu->set_vmem_mode(Arch::Cpu::Paging);
-                cpu->set_vmem_paddr_base(base);
                 cpu->set_vmem_size(limite);
             }
 
