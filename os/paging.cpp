@@ -129,7 +129,7 @@ namespace OS {
         (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Present] = 1;
         (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::PhyFrameID] = pagina_fisica;
         (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Readable] = 1;
-        (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Writable] = 0;
+        (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Writable] = 1;
         (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Executable] = 1;
         (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Dirty] = 0;
         (*tabela_paginas)[indice_memoria_virtual][Arch::Cpu::PteField::Accessed] = 0;
