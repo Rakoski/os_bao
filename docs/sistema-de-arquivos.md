@@ -1,5 +1,9 @@
 # Sistema de arquivos (parte 1)
 
+https://drive.google.com/file/u/2/d/133sxOIERie3VIBlNunXnkeFPCW6qPPkx/view?usp=drive_link
+
+https://drive.google.com/file/d/1ioUDzNGKiniLZru7ZNflexPWMABc_AxG/view
+
 ### arquivos
 
 - uma pasta nada mais é que um arquivo que guarda mais arquivos
@@ -68,4 +72,24 @@ começa prox aula a partir de i-nodes
 - diretórios tbm são i-nodes
 - guarda a lista de i-nodes dentro dele
 
+### Duas soluções
 - o b.o do i-node é que vc tem que fazer i/o no disco pra pegar o nome do arquivo dele
+- guardar tudo relacionado ao arquivo dentro do i-node é mais limpo e ok porém precisa de mais recursos
+
+## Questões sobre o projeto
+
+### journaling
+
+- regiao com nome especial e antes de escrever nos arquivos escrevo aqui o que vou fazer no meu sistema de arquivos
+- faço a alteração e escrevo no journal "terminei de fazer a alteração"
+
+### sistema de arquivos virtual
+
+- que nem a memória virtual
+- interface genérica para sistemas de arquivos
+
+### tamanho do bloco
+- posso ver meus setores de forma agrupada ao invés de separado, vou agrupar meus setores em blocos de 4 por ex
+- quanto maior tamanho do bloco (agrupa vários setores) reduz a fragmentação
+- porém vc perde mais espaço pra arquivos pequenos
+- se vc tiver um arquivo de 10 bytes em setores configurados pra apenas 256 bytes vc perde 246 bytes pra literalmente nada
