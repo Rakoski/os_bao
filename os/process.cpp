@@ -1,4 +1,5 @@
 #ifndef __SO_BAO_HEADER_PROCESS_MANAGER_H__
+
 #define __SO_BAO_HEADER_PROCESS_MANAGER_H__
 
 #include <cstdint>
@@ -48,6 +49,7 @@ namespace OS {
         }
 
         cpu->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
+        cpu->set_page_table(tabela_paginas);
     }
 
     void Process::colocar_alocacao(uint16_t endereco, uint16_t numero_pag, uint16_t tamanho_words) {

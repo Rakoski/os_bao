@@ -12,15 +12,19 @@
 namespace OS {
 
     class ProcessManager {
-    private:
-        Arch::Cpu* cpu;
 
-    public:
-        ProcessManager(Arch::Cpu* cpu);
+        std::list<Process*> processos_rodando_novo;
+        std::list<Process*> processos_dormindo;
 
-        Process* get_process();
-        
-    };
+        private:
+            Arch::Cpu* cpu;
+
+        public:
+            ProcessManager(Arch::Cpu* cpu);
+
+            Process* get_process();
+
+        };
 }
 
 #endif

@@ -22,9 +22,15 @@ Arch::Cpu* cpuglobal = nullptr;
 std::string command_buffer;
 Process* processo_rodando_no_momento = nullptr;
 uint16_t proximo_pid = 1;
-std::vector<Process*> processos_rodando;
+std::list<Process*> processos_rodando_novo;
+std::list<Process*> processos_dormindo;
 Paging* paginacao = nullptr;
 ProcessManager* gerenciador_processos = nullptr;
+
+uint16_t ciclos_timer = Config::timer_default_interrupt_cycles;
+uint16_t contador_timer = 0;
+uint16_t pedaco_tempo_padrao = 100;
+uint32_t comeco = 0;
 
 void kill_process();
 void rerodar_idle();
@@ -48,6 +54,27 @@ void aloca_pagina_fisica(Process* novo_processo) {
     }
 }
 
+void configurar_proximo_processo() {
+    if (!processo_rodando_no_momento || processo_rodando_no_momento->get_estado() != ProcessState::running) return;
+
+    processo_rodando_no_momento->salvar_contexto(cpuglobal);
+    processo_rodando_no_momento->set_estado(ProcessState::ready);
+
+    processos_rodando_novo.push_back(processo_rodando_no_momento);
+
+    Process* proximo_processo = processos_rodando_novo.front();
+    processos_rodando_novo.pop_front();
+    processo_rodando_no_momento = proximo_processo;
+    processo_rodando_no_momento->set_estado(ProcessState::running);
+
+    cpuglobal->set_page_table(processo_rodando_no_momento->get_tabela_paginas());
+    processo_rodando_no_momento->restaurar_contexto(cpuglobal);
+
+    contador_timer = 0;
+
+    terminal_println(cpuglobal, Terminal::Kernel, "mudandouu ", processo_rodando_no_momento->get_pid(), " (", processo_rodando_no_momento->get_name(), ")");
+}
+
 Process* criar_e_configurar_processo(const std::string& filename) {
     std::vector<uint16_t> codigo = Lib::load_from_disk_to_16bit_buffer(filename);
 
@@ -57,6 +84,7 @@ Process* criar_e_configurar_processo(const std::string& filename) {
 
     Arch::Cpu::PageTable* nova_tabela = paginacao->cria_tabela_paginas();
     novo_processo->set_tabela_paginas(nova_tabela);
+    novo_processo->set_estado(ProcessState::running);
 
     uint16_t tamanho_codigo = codigo.size();
     uint16_t paginas_necessarias = std::ceil((double)tamanho_codigo / Config::page_size);
@@ -80,9 +108,9 @@ void run_process() {
     processo_rodando_no_momento->salvar_contexto(cpuglobal);
     processo_rodando_no_momento->set_estado(ProcessState::running);
 
-    auto processo = std::find(processos_rodando.begin(), processos_rodando.end(), processo_rodando_no_momento);
+    auto processo = std::find(processos_rodando_novo.begin(), processos_rodando_novo.end(), processo_rodando_no_momento);
 
-    if (processo == processos_rodando.end()) processos_rodando.push_back(processo_rodando_no_momento);
+    if (processo == processos_rodando_novo.end()) processos_rodando_novo.push_back(processo_rodando_no_momento);
 }
 
 
@@ -124,12 +152,27 @@ void kill_process() {
         return;
     }
 
-    auto it = std::find(processos_rodando.begin(), processos_rodando.end(), processo_rodando_no_momento);
-    if (it != processos_rodando.end()) {
-        processos_rodando.erase(it);
-    }
+    auto it = std::find(processos_rodando_novo.begin(), processos_rodando_novo.end(), processo_rodando_no_momento);
+    if (it != processos_rodando_novo.end()) processos_rodando_novo.erase(it);
 
     rerodar_idle();
+}
+
+void lista_processos() {
+    terminal_println(cpuglobal, Terminal::Command, "\n PID | NOME | ESTADO | PC \n");
+
+    for (Process* processo : processos_rodando_novo) {
+        std::string estado_processo;
+        switch (processo->get_estado()) {
+            case ProcessState::ready: estado_processo = "READY"; break;
+            case ProcessState::running: estado_processo = "RUNNING"; break;
+            case ProcessState::sleeping: estado_processo = "BLOCKED"; break;
+            case ProcessState::finished: estado_processo = "FINISHED"; break;
+        }
+
+        terminal_println(cpuglobal, Terminal::Command, processo->get_pid(), "\t",
+                       processo->get_name(), "\t\t", estado_processo, "\t\t", processo->get_pc());
+    }
 }
 
 void processar_comandos(std::string comando, std::vector<std::string> args) {
@@ -144,6 +187,8 @@ void processar_comandos(std::string comando, std::vector<std::string> args) {
         load_program(args[1]);
     } else if (comando == "kill") {
         kill_process();
+    } else if (comando == "list" || comando == "ps") {
+        lista_processos();
     } else if (comando == "help") {
         Utils::printar_help();
     }
@@ -209,9 +254,9 @@ void tratar_excecao() {
     if (exception.type == Arch::Cpu::CpuException::Type::GPFinvalidInstruction) {
         if (processo_rodando_no_momento->get_name() == "idle.bin") {
             terminal_println(cpuglobal, Terminal::Kernel, "GPFinvalidInstruction, RELODANDO IDLE...");
-            auto it = std::find(processos_rodando.begin(), processos_rodando.end(), processo_rodando_no_momento);
-            if (it != processos_rodando.end()) {
-                processos_rodando.erase(it);
+            auto it = std::find(processos_rodando_novo.begin(), processos_rodando_novo.end(), processo_rodando_no_momento);
+            if (it != processos_rodando_novo.end()) {
+                processos_rodando_novo.erase(it);
             }
             free_processo();
             load_program("idle.bin");
@@ -271,13 +316,13 @@ void syscall_0_fechar_processo() {
     terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "=( o processo pediu pra sair ----> tadinho <---");
     std::string process_name = processo_rodando_no_momento->get_name();
 
-    auto it = std::find(processos_rodando.begin(), processos_rodando.end(), processo_rodando_no_momento);
-    if (it != processos_rodando.end()) {
-        processos_rodando.erase(it);
+    auto it = std::find(processos_rodando_novo.begin(), processos_rodando_novo.end(), processo_rodando_no_momento);
+    if (it != processos_rodando_novo.end()) {
+        processos_rodando_novo.erase(it);
     }
 
     free_processo();
-    if (!processos_rodando.empty()) {
+    if (!processos_rodando_novo.empty()) {
         rerodar_idle();
     }
 }
@@ -367,6 +412,8 @@ void syscall_5_desalocar_memoria() {
 
 void boot(Arch::Cpu *cpu) {
     cpuglobal = cpu;
+    comeco = cpu->read_io(IO_Port::TimerGetTimeSeconds);
+    cpu->write_io(IO_Port::TimerInterruptCycles, ciclos_timer);
     printa_menu(cpu);
     memory_manager = new MemoryManager(Config::phys_mem_size_words);
     paginacao = new Paging();
@@ -389,7 +436,7 @@ bool load_program(const std::string& filename) {
         cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
         cpuglobal->set_page_table(processo->get_tabela_paginas());
 
-        processos_rodando.push_back(processo);
+        processos_rodando_novo.push_back(processo);
 
         processo->set_pc(1);
         cpuglobal->set_pc(1);
@@ -406,6 +453,13 @@ bool load_program(const std::string& filename) {
 void interrupt(const Arch::InterruptCode interrupt) {
     if (interrupt == InterruptCode::Keyboard) tratar_interrupcao_teclado();
     else if (interrupt == Arch::InterruptCode::CpuException) tratar_excecao();
+    else if (interrupt == Arch::InterruptCode::Timer) {
+        contador_timer++;
+        if (contador_timer >= pedaco_tempo_padrao) {
+            contador_timer = 0;
+            configurar_proximo_processo();
+        }
+    }
 }
 
 void syscall() {
@@ -467,7 +521,7 @@ void shutdown() {
         memory_manager = nullptr;
     }
 
-    for (Process* proc : processos_rodando) {
+    for (Process* proc : processos_rodando_novo) {
         delete proc;
     }
 
@@ -481,7 +535,7 @@ void shutdown() {
         paginacao = nullptr;
     }
 
-    processos_rodando.clear();
+    processos_rodando_novo.clear();
     cpuglobal->turn_off();
 }
 

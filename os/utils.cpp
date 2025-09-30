@@ -7,7 +7,7 @@
 
 namespace OS {
     extern Arch::Cpu* cpuglobal;
-    extern std::vector<Process*> processos_rodando;
+    extern std::list<Process*> processos_rodando_novo;
 
     void Utils::setando_novos_regs_pro_processo(OS::Process* process) {
         for (uint16_t i = 0; i < Config::nregs; i++) {
@@ -29,7 +29,7 @@ namespace OS {
     }
 
     Process* Utils::find_idle() {
-        for (Process* processo : processos_rodando) {
+        for (Process* processo : processos_rodando_novo) {
             if (processo->get_name() == "idle.bin") {
                 return processo;
             }

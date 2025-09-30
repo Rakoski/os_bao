@@ -26,7 +26,7 @@ namespace OS {
     enum class ProcessState {
        ready,
        running,
-       bloked,
+       sleeping,
        finished
     };
 
@@ -58,6 +58,9 @@ namespace OS {
         Arch::Cpu::PageTable* tabela_paginas = nullptr;
 
         std::map<uint16_t, AreaMemoriaVirtual> alocacoes;
+
+        uint16_t dormir_ate = 0;
+        uint16_t tempo_criacao = 0;
 
         [[nodiscard]] uint16_t get_pid() const {
                 return pid;
@@ -119,7 +122,7 @@ namespace OS {
                 this->name = name;
             }
 
-            [[nodiscard]] ProcessState state() const {
+            [[nodiscard]] ProcessState get_estado() const {
                 return estado;
             }
 
@@ -127,7 +130,7 @@ namespace OS {
                 estado = state;
             }
 
-            [[nodiscard]] uint16_t program_counter1() const {
+            [[nodiscard]] uint16_t get_pc() const {
                 return pc;
             }
 
@@ -182,6 +185,22 @@ namespace OS {
         void colocar_alocacao(uint16_t endereco, uint16_t numero_pag, uint16_t tamanho_words);
 
         AreaMemoriaVirtual* obter_alocacao(uint16_t endereco);
+
+        [[nodiscard]] uint16_t get_dormir_ate() const {
+            return dormir_ate;
+        }
+
+        void set_dormir_ate(uint16_t dormir_ate) {
+            this->dormir_ate = dormir_ate;
+        }
+
+        [[nodiscard]] uint16_t get_tempo_criacao() const {
+            return tempo_criacao;
+        }
+
+        void set_tempo_criacao(uint16_t tempo_criacao) {
+            this->tempo_criacao = tempo_criacao;
+        }
     };
 }
 
