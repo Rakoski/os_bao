@@ -109,6 +109,7 @@ namespace OS {
                                      const std::vector<uint16_t>& codigo,
                                      Arch::Cpu* cpuglobal) {
     bool mapeamento_passa_limite_tabela = comeco_vmem_pagina + numero_paginas > Config::ptes_per_table;
+        terminal_println(cpuglobal, Terminal::Kernel, "mapeia_e_carrega_codigo: carregando ", numero_paginas, " páginas");
 
     if (!tabela_paginas || mapeamento_passa_limite_tabela) return false;
 
@@ -164,13 +165,6 @@ namespace OS {
         }
     }
 
-    void Paging::carregar_pra_memoria(uint16_t endereco_fisico, Arch::Cpu *cpuglobal) {
-        for (uint16_t i = 0; i < Config::page_size; i++) {
-            terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "carregando codigo..", i);
-            cpuglobal->pmem_write(endereco_fisico + i, 0);
-        }
-    }
-
     bool Paging::verificar_violacao_protecao(Arch::Cpu::PageTableEntry& entrada, Arch::Cpu::CpuException::Type codigo_erro) {
         if (entrada[Arch::Cpu::PteField::Present] != 1) {
             return false;
@@ -215,9 +209,11 @@ namespace OS {
 
             uint16_t endereco_fisico = pagina_finsica * Config::page_size;
 
-            terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada no endereco: " + endereco_fisico);
+            for (uint16_t i = 0; i < Config::page_size; i++) {
+                cpuglobal->pmem_write(endereco_fisico + i, 0);
+            }
 
-            carregar_pra_memoria(endereco_fisico, cpuglobal);
+            terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada no endereco: " + endereco_fisico);
 
             return ResultadoAlocarPagina::deu_bom;
         }
@@ -342,10 +338,4 @@ namespace OS {
 
         return processo->alocacoes.erase(endereco);
     }
-
-
-
-
-
-
 }

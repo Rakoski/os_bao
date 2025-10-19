@@ -39,6 +39,9 @@ namespace OS {
     };
 
     class Process {
+    private:
+        uint16_t tempo_de_criacao;
+
     public:
         uint16_t pid = 0;
         std::string name;
@@ -49,10 +52,8 @@ namespace OS {
         uint16_t pc;
         std::array<uint16_t, Config::nregs> regs;
 
-        // pode ser tanto o tamanho quanto o final (eu fiz como tamanho)
         uint16_t limite = 0;
 
-        // tirar daqui colocar var local
         std::vector<uint16_t> codigo_processo;
 
         Arch::Cpu::PageTable* tabela_paginas = nullptr;
