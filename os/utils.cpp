@@ -4,10 +4,11 @@
 
 #include "utils.h"
 #include "os-lib.h"
+#include "process_manager.h"
 
 namespace OS {
+    extern ProcessManager* gerenciador_processos;
     extern Arch::Cpu* cpuglobal;
-    extern std::vector<Process*> processos_rodando;
 
     void Utils::setando_novos_regs_pro_processo(OS::Process* process) {
         for (uint16_t i = 0; i < Config::nregs; i++) {
@@ -29,10 +30,9 @@ namespace OS {
     }
 
     Process* Utils::find_idle() {
-        for (Process* processo : processos_rodando) {
-            if (processo->get_name() == "idle.bin") {
-                return processo;
-            }
+        const auto& processos_rodando_novo = gerenciador_processos->get_processos_rodando_novo();
+        for (Process* processo : processos_rodando_novo) {
+            if (processo->get_name() == "idle.bin") return processo;
         }
         return nullptr;
     }

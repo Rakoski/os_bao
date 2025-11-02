@@ -21,9 +21,6 @@ namespace OS {
         ~MemoryManager();
 
         bool allocate_memory_for_process(Process* process, uint16_t size_needed);
-        void free_memory(Process* process);
-
-        [[nodiscard]] uint16_t get_free_memory() const;
     };
 
      extern MemoryManager* memory_manager;
