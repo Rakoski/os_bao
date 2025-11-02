@@ -73,6 +73,8 @@ namespace OS {
         bool verificar_violacao_protecao(Arch::Cpu::PageTableEntry& entrada, Arch::Cpu::CpuException::Type codigo_erro);
 
         bool desaloca_a_partir_de_tal_endereco(Arch::Cpu* cpuglobal, uint16_t endereco, Process* processo);
+
+        Arch::Cpu::PageTable* criar_tabela_kernel(Arch::Cpu* cpuglobal);
     };
 
     extern Paging* paging;

@@ -32,6 +32,14 @@ bool load_program(const std::string& filename);
 void tratar_interrupcao_teclado();
 void tratar_excecao();
 
+void tratar_timer() {
+    if (!gerenciador_processos) return;
+
+    gerenciador_processos->acordar_processos_dormindo();
+
+    processo_rodando_no_momento = gerenciador_processos->configurar_proximo_processo(processo_rodando_no_momento, idle);
+}
+
 void aloca_pagina_fisica(Process* novo_processo) {
     uint16_t paginas_necessarias = std::ceil((double)novo_processo->codigo_processo.size() / Config::page_size);
 
@@ -39,10 +47,7 @@ void aloca_pagina_fisica(Process* novo_processo) {
         uint16_t nova_pagina = paging->aloca_pagina_fisica_livre();
         uint16_t endereco_fisico = nova_pagina * Config::page_size;
 
-        for (uint16_t i = 0; i < Config::page_size; i++) {
-            terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada com valor 0: " + endereco_fisico + 1);
-            cpuglobal->pmem_write(endereco_fisico + i, 0);
-        }
+        for (uint16_t i = 0; i < Config::page_size; i++) cpuglobal->pmem_write(endereco_fisico + i, 0);
 
         terminal_println(cpuglobal, Terminal::Kernel, "pagina física alocada DE COMEÇO no endereco: " + endereco_fisico);
     }
@@ -122,65 +127,46 @@ void free_processo() {
     }
 }
 
-void kill_process_pid(std::string pid_string) {
+    void kill_process_pid(std::string pid_string) {
     uint32_t pid = std::stoi(pid_string);
-    
+
     if (idle && idle->get_pid() == pid) {
         terminal_println(cpuglobal, Terminal::Kernel, "Não pode matar o processo idle!");
         return;
     }
-    
-    const auto& processos_rodando_novo_novo = gerenciador_processos->get_processos_rodando_novo();
-    Process* processo_q_quero = nullptr;
 
-    for (Process* processinhos : processos_rodando_novo_novo) {
-        if (processinhos->get_pid() == pid) {
-            processo_q_quero = processinhos;
-            break;
+    if (processo_rodando_no_momento && processo_rodando_no_momento->get_pid() == pid) {
+        terminal_println(cpuglobal, Terminal::Kernel, "matando processo con pid ", pid, " e nome ", processo_rodando_no_momento->get_name());
+
+        gerenciador_processos->remover_processo(processo_rodando_no_momento);
+
+        if (processo_rodando_no_momento->get_tabela_paginas()) {
+            paginacao->libera_tabela_paginas(processo_rodando_no_momento->get_tabela_paginas());
         }
-    }
 
-    if (!processo_q_quero) {
-        terminal_println(cpuglobal, Terminal::Kernel, "Processo con pid ", pid, " não encontrado");
-        return;
-    }
-
-    terminal_println(cpuglobal, Terminal::Kernel, "matando processo con pid ", pid, " e nome ", processo_q_quero->get_name());
-
-    gerenciador_processos->remover_processo(processo_q_quero);
-    bool was_running = (processo_q_quero == processo_rodando_no_momento);
-
-    if (processo_q_quero->get_tabela_paginas()) {
-        paginacao->libera_tabela_paginas(processo_q_quero->get_tabela_paginas());
-    }
-    delete processo_q_quero;
-
-    if (was_running) {
+        delete processo_rodando_no_momento;
         processo_rodando_no_momento = nullptr;
-        
-        if (!gerenciador_processos->emptar_processos_novos()) {
-            Process* proximo = gerenciador_processos->pop_front_processos_novos();
-            if (proximo) {
-                processo_rodando_no_momento = proximo;
-                proximo->set_estado(ProcessState::running);
-                cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
-                cpuglobal->set_page_table(proximo->get_tabela_paginas());
-                proximo->restaurar_contexto(cpuglobal);
-                terminal_println(cpuglobal, Terminal::Kernel, "trocando para processo ", proximo->get_pid());
-            }
-        } else {
-            terminal_println(cpuglobal, Terminal::Kernel, "sem processos, voltando para idle");
-            if (idle) {
-                processo_rodando_no_momento = idle;
-                idle->set_estado(ProcessState::running);
-                cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
-                cpuglobal->set_page_table(idle->get_tabela_paginas());
-                idle->restaurar_contexto(cpuglobal);
-            } else {
-                terminal_println(cpuglobal, Terminal::Kernel, "ERRO: idle process não existe!");
-                cpuglobal->turn_off();
-            }
+
+        tratar_timer();
+    } else {
+        Process* processo_q_quero = gerenciador_processos->encontrar_por_pid(pid);
+
+        if (!processo_q_quero) {
+            terminal_println(cpuglobal, Terminal::Kernel, "Processo con pid ", pid, " não encontrado");
+            return;
         }
+
+        terminal_println(cpuglobal, Terminal::Kernel, "2 matando processo con pid ", pid, " e nome ", processo_q_quero->get_name());
+
+        gerenciador_processos->remover_processo(processo_q_quero);
+
+        // Then clean up page table
+        // if (processo_q_quero->get_tabela_paginas()) {
+        //     paginacao->libera_tabela_paginas(processo_q_quero->get_tabela_paginas());
+        // }
+
+        // Finally delete the process
+        // delete processo_q_quero;
     }
 }
 
@@ -198,10 +184,6 @@ void kill_process() {
     terminal_println(cpuglobal, Terminal::Kernel, "matando processo ", processo_rodando_no_momento->get_pid());
     kill_process_pid(std::to_string(processo_rodando_no_momento->get_pid()));
 }
-
-// olhar qual a regiao do processo q ele ficou e anotar as paginas fisicas de cada um
-
-
 
 void lista_processos() {
     terminal_println(cpuglobal, Terminal::Command, "\n PID | NOME | ESTADO | PC \n");
@@ -382,10 +364,39 @@ uint16_t vmem_to_phys(Arch::Cpu::PageTable& tabela, const uint16_t vaddr) {
 void syscall_0_fechar_processo() {
     terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "=( o processo pediu pra sair ----> tadinho <---");
 
+    if (!processo_rodando_no_momento) return;
+
     gerenciador_processos->remover_processo(processo_rodando_no_momento);
 
-    free_processo();
-    if (!gerenciador_processos->emptar_processos_novos()) rerodar_idle();
+    if (processo_rodando_no_momento->get_tabela_paginas()) {
+        paginacao->libera_tabela_paginas(processo_rodando_no_momento->get_tabela_paginas());
+    }
+    delete processo_rodando_no_momento;
+    processo_rodando_no_momento = nullptr;
+
+    if (!gerenciador_processos->emptar_processos_novos()) {
+        Process* next = gerenciador_processos->pop_front_processos_novos();
+        if (next) {
+            processo_rodando_no_momento = next;
+            next->set_estado(ProcessState::running);
+            cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
+            cpuglobal->set_page_table(next->get_tabela_paginas());
+            next->restaurar_contexto(cpuglobal);
+            terminal_println(cpuglobal, Terminal::Kernel, "Processo terminou, trocando para ", next->get_pid());
+        }
+    } else {
+        terminal_println(cpuglobal, Terminal::Kernel, "Processo terminou, voltando para idle");
+        if (idle) {
+            processo_rodando_no_momento = idle;
+            idle->set_estado(ProcessState::running);
+            cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
+            cpuglobal->set_page_table(idle->get_tabela_paginas());
+            idle->restaurar_contexto(cpuglobal);
+        } else {
+            terminal_println(cpuglobal, Terminal::Kernel, "ERRO: idle não existe!");
+            cpuglobal->turn_off();
+        }
+    }
 }
 
 void syscall_1_imprimir_string() {
@@ -473,12 +484,16 @@ void syscall_5_desalocar_memoria() {
 
 void boot(Arch::Cpu *cpu) {
     cpuglobal = cpu;
+
+    paginacao = new Paging();
+
+    cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
+
     gerenciador_processos = new ProcessManager(cpuglobal);
     gerenciador_processos->set_comeco(cpuglobal->read_io(IO_Port::TimerGetTimeSeconds));
     cpuglobal->write_io(IO_Port::TimerInterruptCycles, gerenciador_processos->get_ciclos_timer());
     printa_menu(cpuglobal);
     memory_manager = new MemoryManager(Config::phys_mem_size_words);
-    paginacao = new Paging();
 
     idle = criar_e_configurar_processo("idle.bin");
     if (!idle) {
@@ -489,15 +504,13 @@ void boot(Arch::Cpu *cpu) {
 
     processo_rodando_no_momento = idle;
     idle->set_estado(ProcessState::running);
-    cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
+
     cpuglobal->set_page_table(idle->get_tabela_paginas());
     cpuglobal->set_pc(idle->get_pc());
 
-    for (uint16_t i = 0; i < Config::nregs; i++) {
-        cpuglobal->set_gpr(i, idle->get_regs(i));
-    }
+    for (uint16_t i = 0; i < Config::nregs; i++) cpuglobal->set_gpr(i, idle->get_regs(i));
 
-    terminal_println(cpuglobal, Terminal::Kernel, "Idle process iniciado com PID ", idle->get_pid());
+    terminal_println(cpuglobal, Terminal::Kernel, "processo idle iniciado com PID ", idle->get_pid());
 }
 
 bool load_program(const std::string& filename) {
@@ -530,21 +543,13 @@ bool load_program(const std::string& filename) {
     }
 }
 
-    void interrupt(const Arch::InterruptCode interrupt) {
-    if (interrupt == InterruptCode::Keyboard) tratar_interrupcao_teclado();
-    else if (interrupt == Arch::InterruptCode::CpuException) tratar_excecao();
-    else if (interrupt == Arch::InterruptCode::Timer) {
-        terminal_println(cpuglobal, Terminal::Kernel, "oiii timer");
-        gerenciador_processos->acordar_processos_dormindo();
-
-        uint32_t contador_timer = gerenciador_processos->get_contador_timer();
-        gerenciador_processos->set_contador_timer(contador_timer + 1);
-
-        uint32_t pedaco_tempo_padrao = gerenciador_processos->get_pedaco_tempo_padrao();
-        if (contador_timer + 1 >= pedaco_tempo_padrao) {
-            gerenciador_processos->set_contador_timer(0);
-            processo_rodando_no_momento = gerenciador_processos->configurar_proximo_processo(processo_rodando_no_momento, idle);
-        }
+void interrupt(const Arch::InterruptCode interrupt) {
+    if (interrupt == InterruptCode::Keyboard) {
+        tratar_interrupcao_teclado();
+    } else if (interrupt == InterruptCode::CpuException) {
+        tratar_excecao();
+    } else if (interrupt == Arch::InterruptCode::Timer) {
+        tratar_timer();
     }
 }
 

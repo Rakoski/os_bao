@@ -43,18 +43,23 @@ namespace OS {
     void ProcessManager::remover_processo(Process* processo_removivel) {
         if (!processo_removivel) return;
 
-        auto it = std::find(processos_rodando_novo.begin(), processos_rodando_novo.end(), processo_removivel);
-        if (it != processos_rodando_novo.end()) {
-            processos_rodando_novo.erase(it);
-            return;
+        terminal_println(cpuglobal, Terminal::Kernel, "DEBUG: Removing process ", processo_removivel->get_pid(), " from lists");
+
+        auto acordado = std::find(processos_rodando_novo.begin(), processos_rodando_novo.end(), processo_removivel);
+        if (acordado != processos_rodando_novo.end()) {
+            processos_rodando_novo.erase(acordado);
+            terminal_println(cpuglobal, Terminal::Kernel, "DEBUG: Removed from running list");
         }
 
-        auto sleep_it = std::find(processos_dormindo.begin(), processos_dormindo.end(), processo_removivel);
-        if (sleep_it != processos_dormindo.end()) {
-            processos_dormindo.erase(sleep_it);
+        auto dormindo = std::find(processos_dormindo.begin(), processos_dormindo.end(), processo_removivel);
+        if (dormindo != processos_dormindo.end()) {
+            processos_dormindo.erase(dormindo);
+            terminal_println(cpuglobal, Terminal::Kernel, "DEBUG: Removed from sleeping list");
         }
     }
 
+    // fora isso, por interrupt do timer deixar como ready
+    // syscall 6 que vai p dormir
     void ProcessManager::dormir_processo(Process *processos_dormante, uint16_t segundos) {
         if (!processos_dormante) return;
 
@@ -94,31 +99,34 @@ namespace OS {
     }
 
     Process* ProcessManager::configurar_proximo_processo(Process* processo_rodando_no_momento, Process* idle) {
-        if (!processo_rodando_no_momento || processo_rodando_no_momento->get_estado() != ProcessState::running) return nullptr;
-
-        processo_rodando_no_momento->salvar_contexto(cpuglobal);
-        processo_rodando_no_momento->set_estado(ProcessState::ready);
-
-        if (processo_rodando_no_momento != idle) push_back_processos_novos(processo_rodando_no_momento);
+        if (processo_rodando_no_momento) {
+            processo_rodando_no_momento->salvar_contexto(cpuglobal);
+            processo_rodando_no_momento->set_estado(ProcessState::ready);
+            if (processo_rodando_no_momento != idle) push_back_processos_novos(processo_rodando_no_momento);
+        }
 
         Process* proximo_processo = pop_front_processos_novos();
 
         if (!proximo_processo) {
-            if (!idle) {
-                terminal_println(cpuglobal, Terminal::Kernel, "ue idle não existe?? e agr kkkkk");
-                cpuglobal->turn_off();
-                return nullptr;
-            }
             proximo_processo = idle;
         }
 
-        processo_rodando_no_momento = proximo_processo;
-        processo_rodando_no_momento->set_estado(ProcessState::running);
-        cpuglobal->set_page_table(processo_rodando_no_momento->get_tabela_paginas());
-        processo_rodando_no_momento->restaurar_contexto(cpuglobal);
+        terminal_println(cpuglobal,  Terminal::Kernel, "proximo processo ", proximo_processo->get_name());
+
+        proximo_processo->set_estado(ProcessState::running);
+        cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
+        cpuglobal->set_page_table(proximo_processo->get_tabela_paginas());
+        proximo_processo->restaurar_contexto(cpuglobal);
         set_contador_timer(0);
 
-        terminal_println(cpuglobal, Terminal::Kernel, "mudando para ", processo_rodando_no_momento->get_pid(), " (", processo_rodando_no_momento->get_name(), ")");
-        return processo_rodando_no_momento;
+        terminal_println(cpuglobal,  Terminal::Kernel, "mudando para: ", proximo_processo->get_pid(), "(", proximo_processo->get_name(), ")");
+        return proximo_processo;
+    }
+
+    Process *ProcessManager::encontrar_por_pid(uint16_t pid) {
+        for (Process* processo : processos_rodando_novo) if (processo->get_pid() == pid) return processo;
+        for (Process* processo_dormente : processos_dormindo) if (processo_dormente->get_pid() == pid) return processo_dormente;
+
+        return nullptr;
     }
 }
