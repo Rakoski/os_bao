@@ -338,4 +338,25 @@ namespace OS {
 
         return processo->alocacoes.erase(endereco);
     }
+
+    Arch::Cpu::PageTable *Paging::criar_tabela_kernel(Arch::Cpu* cpuglobal) {
+        Arch::Cpu::PageTable* kernel_table = cria_tabela_paginas();
+
+        uint16_t num_frames_fisicos = Config::phys_mem_size_words / Config::page_size;
+
+        terminal_println(cpuglobal, Terminal::Kernel, "Mapeando ", num_frames_fisicos, " frames físicos para o kernel...");
+
+        for (uint16_t i = 0; i < num_frames_fisicos; i++) {
+            (*kernel_table)[i][Arch::Cpu::PteField::PhyFrameID] = i;
+            (*kernel_table)[i][Arch::Cpu::PteField::Present] = 1;
+            (*kernel_table)[i][Arch::Cpu::PteField::Readable] = 1;
+            (*kernel_table)[i][Arch::Cpu::PteField::Writable] = 1;
+            (*kernel_table)[i][Arch::Cpu::PteField::Executable] = 1;
+            (*kernel_table)[i][Arch::Cpu::PteField::Foo] = 0; // nao usuario
+        }
+
+
+        return kernel_table;
+    }
+
 }

@@ -50,6 +50,10 @@ namespace OS {
 
             Process* configurar_proximo_processo(Process* processo_rodando_no_momento, Process* idle);
 
+            void escalonar(Process* processo);
+
+            Process* encontrar_por_pid(uint16_t pid);
+
             std::list<Process *> get_processos_rodando_novo() const {
                 return processos_rodando_novo;
             }
