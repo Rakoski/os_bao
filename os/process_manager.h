@@ -54,23 +54,23 @@ namespace OS {
 
             Process* encontrar_por_pid(uint16_t pid);
 
-            std::list<Process *> get_processos_rodando_novo() const {
+            std::list<Process*> get_processos_rodando_novo() const {
                 return processos_rodando_novo;
             }
 
-            void set_processos_rodando_novo(const std::list<Process *> &processos_rodando_novo) {
+            void set_processos_rodando_novo(const std::list<Process*> &processos_rodando_novo) {
                 this->processos_rodando_novo = processos_rodando_novo;
             }
 
-            std::list<Process *> get_processos_dormindo() const {
+            std::list<Process*> get_processos_dormindo() const {
                 return processos_dormindo;
             }
 
-            void set_processos_dormindo(const std::list<Process *> &processos_dormindo) {
+            void set_processos_dormindo(const std::list<Process*> &processos_dormindo) {
                 this->processos_dormindo = processos_dormindo;
             }
 
-            Arch::Cpu * get_cpu() const {
+            Arch::Cpu* get_cpu() const {
                 return cpuglobal;
             }
 

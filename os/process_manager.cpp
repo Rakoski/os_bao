@@ -45,10 +45,21 @@ namespace OS {
 
         terminal_println(cpuglobal, Terminal::Kernel, "DEBUG: Removing process ", processo_removivel->get_pid(), " from lists");
 
-        auto acordado = std::find(processos_rodando_novo.begin(), processos_rodando_novo.end(), processo_removivel);
-        if (acordado != processos_rodando_novo.end()) {
-            processos_rodando_novo.erase(acordado);
-            terminal_println(cpuglobal, Terminal::Kernel, "DEBUG: Removed from running list");
+        auto processo = processos_rodando_novo.begin();
+        while (processo != processos_rodando_novo.end()) {
+            terminal_println(cpuglobal, Terminal::Kernel, "processo ", (*processo)->get_pid(), " passando");
+            if (*processo == processo_removivel) {
+                terminal_println(cpuglobal, Terminal::Kernel, "DEBUG: removendooou while ", processo_removivel->get_pid(), " from lists");
+                processo = processos_rodando_novo.erase(processo);
+            } else {
+                ++processo;
+            }
+        }
+
+
+        terminal_println(cpuglobal, Terminal::Kernel, "nova lista de processos rodando: ");
+        for (Process* processo : processos_rodando_novo) {
+            terminal_println(cpuglobal, Terminal::Kernel, "nova lista de processos rodando: ", processo->get_pid());
         }
 
         auto dormindo = std::find(processos_dormindo.begin(), processos_dormindo.end(), processo_removivel);

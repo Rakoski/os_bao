@@ -127,7 +127,7 @@ void free_processo() {
     }
 }
 
-    void kill_process_pid(std::string pid_string) {
+void kill_process_pid(std::string pid_string) {
     uint32_t pid = std::stoi(pid_string);
 
     if (idle && idle->get_pid() == pid) {
@@ -140,9 +140,7 @@ void free_processo() {
 
         gerenciador_processos->remover_processo(processo_rodando_no_momento);
 
-        if (processo_rodando_no_momento->get_tabela_paginas()) {
-            paginacao->libera_tabela_paginas(processo_rodando_no_momento->get_tabela_paginas());
-        }
+        if (processo_rodando_no_momento->get_tabela_paginas()) paginacao->libera_tabela_paginas(processo_rodando_no_momento->get_tabela_paginas());
 
         delete processo_rodando_no_momento;
         processo_rodando_no_momento = nullptr;
@@ -160,13 +158,11 @@ void free_processo() {
 
         gerenciador_processos->remover_processo(processo_q_quero);
 
-        // Then clean up page table
-        // if (processo_q_quero->get_tabela_paginas()) {
-        //     paginacao->libera_tabela_paginas(processo_q_quero->get_tabela_paginas());
-        // }
+        if (processo_q_quero->get_tabela_paginas()) paginacao->libera_tabela_paginas(processo_q_quero->get_tabela_paginas());
 
-        // Finally delete the process
-        // delete processo_q_quero;
+        delete processo_q_quero;
+
+        tratar_timer();
     }
 }
 
@@ -525,7 +521,7 @@ bool load_program(const std::string& filename) {
         gerenciador_processos->push_back_processos_novos(processo);
 
         if (processo_rodando_no_momento == idle) {
-            processo_rodando_no_momento = processo;
+            processo_rodando_no_momento = gerenciador_processos->pop_front_processos_novos();
             processo->set_estado(ProcessState::running);
             cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
             cpuglobal->set_page_table(processo->get_tabela_paginas());
