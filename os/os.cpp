@@ -490,33 +490,25 @@ void boot(Arch::Cpu *cpu) {
 }
 
 bool load_program(const std::string& filename) {
-    if (!memory_manager) {
-        memory_manager = new MemoryManager(Config::phys_mem_size_words);
-    }
+    if (!memory_manager) memory_manager = new MemoryManager(Config::phys_mem_size_words);
 
-    try {
-        Process* processo = criar_e_configurar_processo(filename);
-        if (!processo) return false;
+    Process* processo = criar_e_configurar_processo(filename);
+    if (!processo) return false;
 
-        gerenciador_processos->push_back_processos_novos(processo);
+    gerenciador_processos->push_back_processos_novos(processo);
 
-        if (processo_rodando_no_momento == idle) {
-            processo_rodando_no_momento = gerenciador_processos->pop_front_processos_novos();
-            processo->set_estado(ProcessState::running);
-            cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
-            cpuglobal->set_page_table(processo->get_tabela_paginas());
-            cpuglobal->set_pc(processo->get_pc());
-            for (uint16_t i = 0; i < Config::nregs; i++) cpuglobal->set_gpr(i, processo->get_regs(i));
-            terminal_println(cpuglobal, Terminal::Kernel, "trocando para processo: ", processo->get_name());
-        } else terminal_println(cpuglobal, Terminal::Kernel, "processo: ", processo->get_name(), " add a fila ");
-        Utils::exibir_info_processo(processo);
-        return true;
+    if (processo_rodando_no_momento == idle) {
+        processo_rodando_no_momento = gerenciador_processos->pop_front_processos_novos();
+        processo->set_estado(ProcessState::running);
+        cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
+        cpuglobal->set_page_table(processo->get_tabela_paginas());
+        cpuglobal->set_pc(processo->get_pc());
+        for (uint16_t i = 0; i < Config::nregs; i++) cpuglobal->set_gpr(i, processo->get_regs(i));
+        terminal_println(cpuglobal, Terminal::Kernel, "trocando para processo: ", processo->get_name());
+    } else terminal_println(cpuglobal, Terminal::Kernel, "processo: ", processo->get_name(), " add praa fila ");
+    Utils::exibir_info_processo(processo);
+    return true;
 
-    } catch (const Mylib::Exception& e) {
-        terminal_println(cpuglobal, Terminal::Kernel, "execao brabissima!!!!!! tratandooou vamo matar ele!! ", e.what());
-        kill_process();
-        return false;
-    }
 }
 
 void interrupt(const Arch::InterruptCode interrupt) {

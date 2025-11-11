@@ -152,8 +152,12 @@ void ProcessManager::lista_processos(Arch::Cpu *cpuglobal, Process* processo_rod
             }
         }
 
-        if (!tanafila) std::string estado_processo = "RUNNING";
-
+        if (!tanafila) {
+            std::string estado_processo = "RUNNING";
+            terminal_println(cpuglobal, Terminal::Command, " *", processo_rodando_no_momento->get_pid(), "\t",
+                           processo_rodando_no_momento->get_name(), "\t\t", estado_processo, "\t\t",
+                           processo_rodando_no_momento->get_pc());
+        }
     }
 
     const auto& processos_novo = get_processos_rodando_novo();
