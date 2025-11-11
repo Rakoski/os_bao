@@ -2,8 +2,9 @@
 #include <sstream>
 #include <vector>
 #include <cstdint>
-#include <algorithm>
 #include <cmath>
+
+// perguntar p eduardo qual assembly tem syscall
 
 #include "../config.h"
 #include "../lib.h"
@@ -181,48 +182,6 @@ void kill_process() {
     kill_process_pid(std::to_string(processo_rodando_no_momento->get_pid()));
 }
 
-void lista_processos() {
-    terminal_println(cpuglobal, Terminal::Command, "\n PID | NOME | ESTADO | PC \n");
-
-    if (idle) {
-        std::string estado_idle;
-        switch (idle->get_estado()) {
-            case ProcessState::ready: estado_idle = "READY"; break;
-            case ProcessState::running: estado_idle = "RUNNING"; break;
-            case ProcessState::sleeping: estado_idle = "SLEEPING"; break;
-            case ProcessState::finished: estado_idle = "FINISHED"; break;
-        }
-
-        std::string marca = (idle == processo_rodando_no_momento) ? " *" : "  ";
-        terminal_println(cpuglobal, Terminal::Command, marca, idle->get_pid(), "\t",
-                       idle->get_name(), "\t\t", estado_idle, "\t\t", idle->get_pc(), " (system)");
-    }
-
-    const auto& processos_novo = gerenciador_processos->get_processos_rodando_novo();
-    for (Process* processo : processos_novo) {
-        std::string estado_processo;
-        switch (processo->get_estado()) {
-            case ProcessState::ready: estado_processo = "READY"; break;
-            case ProcessState::running: estado_processo = "RUNNING"; break;
-            case ProcessState::sleeping: estado_processo = "SLEEPING"; break;
-            case ProcessState::finished: estado_processo = "FINISHED"; break;
-        }
-
-        std::string marca = (processo == processo_rodando_no_momento) ? " *" : "  ";
-        terminal_println(cpuglobal, Terminal::Command, marca, processo->get_pid(), "\t",
-                       processo->get_name(), "\t\t", estado_processo, "\t\t", processo->get_pc());
-    }
-
-    const auto& dormindo = gerenciador_processos->get_processos_dormindo();
-    if (!dormindo.empty()) {
-        terminal_println(cpuglobal, Terminal::Command, "\n--- Processos Dormindo ---");
-        for (Process* processo : dormindo) {
-            terminal_println(cpuglobal, Terminal::Command, "  ", processo->get_pid(), "\t",
-                           processo->get_name(), "\t\tSLEEPING");
-        }
-    }
-}
-
 void processar_comandos(std::string comando, std::vector<std::string> args) {
     if (comando == "exit") {
         terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "Desligando...");
@@ -237,7 +196,7 @@ void processar_comandos(std::string comando, std::vector<std::string> args) {
         if (args.size() < 2) kill_process();
         else kill_process_pid(args[1]);
     } else if (comando == "list" || comando == "ps") {
-        lista_processos();
+        gerenciador_processos->lista_processos(cpuglobal, processo_rodando_no_momento);
     } else if (comando == "help") {
         Utils::printar_help();
     }
@@ -477,6 +436,27 @@ void syscall_5_desalocar_memoria() {
     }
 }
 
+void syscall_6_dormir_processo() {
+    uint16_t segundos = cpuglobal->get_gpr(1);
+
+    terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "processo ", processo_rodando_no_momento->get_pid(), " vai dormir por ", segundos, " segundos");
+
+    processo_rodando_no_momento->salvar_contexto(cpuglobal);
+
+    gerenciador_processos->dormir_processo(processo_rodando_no_momento, segundos);
+
+    processo_rodando_no_momento = gerenciador_processos->configurar_proximo_processo(nullptr, idle);
+}
+
+void syscall_7_retornar_tempo_iniciacao() {
+    uint16_t tempo_sistema = gerenciador_processos->get_tempo_sistema();
+    uint16_t tempo_desde_criacao = tempo_sistema - processo_rodando_no_momento->get_tempo_criacao();
+
+    cpuglobal->set_gpr(1, tempo_desde_criacao);
+
+    terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "processo ", processo_rodando_no_momento->get_pid(), " tempo desde criação: ", tempo_desde_criacao, " segundos");
+}
+
 
 void boot(Arch::Cpu *cpu) {
     cpuglobal = cpu;
@@ -585,6 +565,16 @@ void syscall() {
 
         case 5: {
             syscall_5_desalocar_memoria();
+            break;
+        }
+
+        case 6: {
+            syscall_6_dormir_processo();
+            break;
+        }
+
+        case 7: {
+            syscall_7_retornar_tempo_iniciacao();
             break;
         }
 

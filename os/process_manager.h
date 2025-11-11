@@ -54,6 +54,8 @@ namespace OS {
 
             Process* encontrar_por_pid(uint16_t pid);
 
+            void lista_processos(Arch::Cpu* cpuglobal, Process* processo_rodando_no_momento);
+
             std::list<Process*> get_processos_rodando_novo() const {
                 return processos_rodando_novo;
             }
