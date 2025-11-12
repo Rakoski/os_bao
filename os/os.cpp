@@ -571,7 +571,7 @@ void syscall() {
         }
 
         default:
-            terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "kakakka q porra de cod syscall é esse vei: ", cod_syscall);
+            terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "kakakka q porra de cod syscall é essa vei: ", cod_syscall);
             break;
 
     }

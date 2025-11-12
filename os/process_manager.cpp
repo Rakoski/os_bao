@@ -43,6 +43,8 @@ namespace OS {
     void ProcessManager::remover_processo(Process* processo_removivel) {
         if (!processo_removivel) return;
 
+        // arrumar nomes aq colocar it
+        // usar uma remove / remove if
         auto processo = processos_rodando_novo.begin();
         while (processo != processos_rodando_novo.end()) {
             terminal_println(cpuglobal, Terminal::Kernel, "processo ", (*processo)->get_pid(), " passando");
