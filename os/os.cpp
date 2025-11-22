@@ -184,12 +184,12 @@ void kill_process() {
 
 void processar_timer(std::vector<std::string> ciclos) {
     if (ciclos.size() < 2) {
-        uint32_t ciclos_atuais = gerenciador_processos->get_ciclos_timer();
+        uint16_t ciclos_atuais = gerenciador_processos->get_ciclos_timer();
         terminal_println(cpuglobal, Arch::Terminal::Type::Command, "\nciclos do timer: ", ciclos_atuais);
         return;
     }
 
-    uint32_t novos_ciclos = std::stoi(ciclos[1]);
+    uint16_t novos_ciclos = std::stoi(ciclos[1]);
     if (novos_ciclos == 0) terminal_println(cpuglobal, Arch::Terminal::Type::Command, "número de ciclos precisa ser maior que 0");
 
     gerenciador_processos->set_ciclos_timer(novos_ciclos);
