@@ -182,6 +182,20 @@ void kill_process() {
     kill_process_pid(std::to_string(processo_rodando_no_momento->get_pid()));
 }
 
+void processar_timer(std::vector<std::string> ciclos) {
+    if (ciclos.size() < 2) {
+        uint32_t ciclos_atuais = gerenciador_processos->get_ciclos_timer();
+        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "\nciclos do timer: ", ciclos_atuais);
+        return;
+    }
+
+    uint32_t novos_ciclos = std::stoi(ciclos[1]);
+    if (novos_ciclos == 0) terminal_println(cpuglobal, Arch::Terminal::Type::Command, "número de ciclos precisa ser maior que 0");
+
+    gerenciador_processos->set_ciclos_timer(novos_ciclos);
+    terminal_println(cpuglobal, Arch::Terminal::Type::Command, "timer agora em ", novos_ciclos, " ciclos");
+}
+
 void processar_comandos(std::string comando, std::vector<std::string> args) {
     if (comando == "exit") {
         terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "Desligando...");
@@ -199,10 +213,10 @@ void processar_comandos(std::string comando, std::vector<std::string> args) {
         gerenciador_processos->lista_processos(cpuglobal, processo_rodando_no_momento);
     } else if (comando == "help") {
         Utils::printar_help();
+    } else if (comando == "timer") {
+        processar_timer(args);
     }
-    else {
-        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "Digite 'help'    para ver os comandos disponíveis");
-    }
+    else terminal_println(cpuglobal, Arch::Terminal::Type::Command, "Digite 'help'    para ver os comandos disponíveis");
 }
 
 void process_command(const std::string& palavra) {
