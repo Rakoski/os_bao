@@ -43,18 +43,29 @@ namespace OS {
     void ProcessManager::remover_processo(Process* processo_removivel) {
         if (!processo_removivel) return;
 
-        terminal_println(cpuglobal, Terminal::Kernel, "DEBUG: Removing process ", processo_removivel->get_pid(), " from lists");
+        // arrumar nomes aq colocar it
+        // usar uma remove / remove if
+        auto processo = processos_rodando_novo.begin();
+        while (processo != processos_rodando_novo.end()) {
+            terminal_println(cpuglobal, Terminal::Kernel, "processo ", (*processo)->get_pid(), " passando");
+            if (*processo == processo_removivel) {
+                terminal_println(cpuglobal, Terminal::Kernel, "DEBUG: removendooou while ", processo_removivel->get_pid(), " das lista td");
+                processo = processos_rodando_novo.erase(processo);
+            } else {
+                ++processo;
+            }
+        }
 
-        auto acordado = std::find(processos_rodando_novo.begin(), processos_rodando_novo.end(), processo_removivel);
-        if (acordado != processos_rodando_novo.end()) {
-            processos_rodando_novo.erase(acordado);
-            terminal_println(cpuglobal, Terminal::Kernel, "DEBUG: Removed from running list");
+
+        terminal_println(cpuglobal, Terminal::Kernel, "nova lista de processos rodando: ");
+        for (Process* processo : processos_rodando_novo) {
+            terminal_println(cpuglobal, Terminal::Kernel, "nova lista de processos rodando: ", processo->get_pid());
         }
 
         auto dormindo = std::find(processos_dormindo.begin(), processos_dormindo.end(), processo_removivel);
         if (dormindo != processos_dormindo.end()) {
             processos_dormindo.erase(dormindo);
-            terminal_println(cpuglobal, Terminal::Kernel, "DEBUG: Removed from sleeping list");
+            terminal_println(cpuglobal, Terminal::Kernel, "DEBUG: removendoooo da lista dormindooo!!");
         }
     }
 
@@ -129,4 +140,53 @@ namespace OS {
 
         return nullptr;
     }
+
+void ProcessManager::lista_processos(Arch::Cpu *cpuglobal, Process* processo_rodando_no_momento) {
+    terminal_println(cpuglobal, Terminal::Command, "\n=== PROCESSOS ===\n");
+    terminal_println(cpuglobal, Terminal::Command, " PID\tNOME\t\tESTADO\t\tPC\t\tTABELA PAGINA\t\tTEMPO DE CRIACAO\n");
+
+    if (processo_rodando_no_momento && processo_rodando_no_momento) {
+        std::string estado_processo = "RUNNING";
+        terminal_println(cpuglobal, Terminal::Command, " *", processo_rodando_no_momento->get_pid(), "\t",
+                       processo_rodando_no_momento->get_name(), "\t\t", estado_processo, "\t\t",
+                       processo_rodando_no_momento->get_pc(), "\t\t", processo_rodando_no_momento->get_tabela_paginas(),
+                       "\t\t", processo_rodando_no_momento->get_tempo_criacao());
+    }
+
+    const auto& processos_novo = get_processos_rodando_novo();
+    for (Process* processo : processos_novo) {
+        std::string estado_processo;
+        switch (processo->get_estado()) {
+            case ProcessState::ready: estado_processo = "READY"; break;
+            case ProcessState::running: estado_processo = "RUNNING"; break;
+            case ProcessState::sleeping: estado_processo = "SLEEPING"; break;
+            case ProcessState::finished: estado_processo = "FINISHED"; break;
+        }
+
+        std::string marca = (processo == processo_rodando_no_momento) ? " *" : "  ";
+        terminal_println(cpuglobal, Terminal::Command, marca, processo->get_pid(), "\t",
+                       processo->get_name(), "\t\t", estado_processo, "\t\t", processo->get_pc(), "\t\t",
+                       processo->get_tabela_paginas(), "\t\t", processo->get_tempo_criacao());
+    }
+
+    const auto& dormindo = get_processos_dormindo();
+    if (!dormindo.empty()) {
+        terminal_println(cpuglobal, Terminal::Command, "");
+        for (Process* processo : dormindo) {
+            uint16_t tempo_atual = get_tempo_sistema();
+            uint16_t tempo_vida = tempo_atual - processo->get_tempo_criacao();
+            uint16_t tempo_restante = (processo->get_dormir_ate() > tempo_atual)
+                                      ? (processo->get_dormir_ate() - tempo_atual)
+                                      : 0;
+
+            terminal_println(cpuglobal, Terminal::Command,
+                           "  ", processo->get_pid(), " | ",
+                           processo->get_name(), " | ",
+                           "SLEEPING  | ",
+                           processo->get_pc(), " | ",
+                           processo->get_tempo_criacao(), "s (", tempo_vida, "s) | ",
+                           processo->get_dormir_ate(), "s (", tempo_restante, "s restantes)");
+        }
+    }
+}
 }

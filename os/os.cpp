@@ -2,8 +2,9 @@
 #include <sstream>
 #include <vector>
 #include <cstdint>
-#include <algorithm>
 #include <cmath>
+
+// perguntar p eduardo qual assembly tem syscall
 
 #include "../config.h"
 #include "../lib.h"
@@ -127,7 +128,7 @@ void free_processo() {
     }
 }
 
-    void kill_process_pid(std::string pid_string) {
+void kill_process_pid(std::string pid_string) {
     uint32_t pid = std::stoi(pid_string);
 
     if (idle && idle->get_pid() == pid) {
@@ -140,9 +141,7 @@ void free_processo() {
 
         gerenciador_processos->remover_processo(processo_rodando_no_momento);
 
-        if (processo_rodando_no_momento->get_tabela_paginas()) {
-            paginacao->libera_tabela_paginas(processo_rodando_no_momento->get_tabela_paginas());
-        }
+        if (processo_rodando_no_momento->get_tabela_paginas()) paginacao->libera_tabela_paginas(processo_rodando_no_momento->get_tabela_paginas());
 
         delete processo_rodando_no_momento;
         processo_rodando_no_momento = nullptr;
@@ -160,13 +159,11 @@ void free_processo() {
 
         gerenciador_processos->remover_processo(processo_q_quero);
 
-        // Then clean up page table
-        // if (processo_q_quero->get_tabela_paginas()) {
-        //     paginacao->libera_tabela_paginas(processo_q_quero->get_tabela_paginas());
-        // }
+        if (processo_q_quero->get_tabela_paginas()) paginacao->libera_tabela_paginas(processo_q_quero->get_tabela_paginas());
 
-        // Finally delete the process
-        // delete processo_q_quero;
+        delete processo_q_quero;
+
+        tratar_timer();
     }
 }
 
@@ -185,46 +182,18 @@ void kill_process() {
     kill_process_pid(std::to_string(processo_rodando_no_momento->get_pid()));
 }
 
-void lista_processos() {
-    terminal_println(cpuglobal, Terminal::Command, "\n PID | NOME | ESTADO | PC \n");
-
-    if (idle) {
-        std::string estado_idle;
-        switch (idle->get_estado()) {
-            case ProcessState::ready: estado_idle = "READY"; break;
-            case ProcessState::running: estado_idle = "RUNNING"; break;
-            case ProcessState::sleeping: estado_idle = "SLEEPING"; break;
-            case ProcessState::finished: estado_idle = "FINISHED"; break;
-        }
-
-        std::string marca = (idle == processo_rodando_no_momento) ? " *" : "  ";
-        terminal_println(cpuglobal, Terminal::Command, marca, idle->get_pid(), "\t",
-                       idle->get_name(), "\t\t", estado_idle, "\t\t", idle->get_pc(), " (system)");
+void processar_timer(std::vector<std::string> ciclos) {
+    if (ciclos.size() < 2) {
+        uint16_t ciclos_atuais = gerenciador_processos->get_ciclos_timer();
+        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "\nciclos do timer: ", ciclos_atuais);
+        return;
     }
 
-    const auto& processos_novo = gerenciador_processos->get_processos_rodando_novo();
-    for (Process* processo : processos_novo) {
-        std::string estado_processo;
-        switch (processo->get_estado()) {
-            case ProcessState::ready: estado_processo = "READY"; break;
-            case ProcessState::running: estado_processo = "RUNNING"; break;
-            case ProcessState::sleeping: estado_processo = "SLEEPING"; break;
-            case ProcessState::finished: estado_processo = "FINISHED"; break;
-        }
+    uint16_t novos_ciclos = std::stoi(ciclos[1]);
+    if (novos_ciclos == 0) terminal_println(cpuglobal, Arch::Terminal::Type::Command, "número de ciclos precisa ser maior que 0");
 
-        std::string marca = (processo == processo_rodando_no_momento) ? " *" : "  ";
-        terminal_println(cpuglobal, Terminal::Command, marca, processo->get_pid(), "\t",
-                       processo->get_name(), "\t\t", estado_processo, "\t\t", processo->get_pc());
-    }
-
-    const auto& dormindo = gerenciador_processos->get_processos_dormindo();
-    if (!dormindo.empty()) {
-        terminal_println(cpuglobal, Terminal::Command, "\n--- Processos Dormindo ---");
-        for (Process* processo : dormindo) {
-            terminal_println(cpuglobal, Terminal::Command, "  ", processo->get_pid(), "\t",
-                           processo->get_name(), "\t\tSLEEPING");
-        }
-    }
+    gerenciador_processos->set_ciclos_timer(novos_ciclos);
+    terminal_println(cpuglobal, Arch::Terminal::Type::Command, "timer agora em ", novos_ciclos, " ciclos");
 }
 
 void processar_comandos(std::string comando, std::vector<std::string> args) {
@@ -241,13 +210,13 @@ void processar_comandos(std::string comando, std::vector<std::string> args) {
         if (args.size() < 2) kill_process();
         else kill_process_pid(args[1]);
     } else if (comando == "list" || comando == "ps") {
-        lista_processos();
+        gerenciador_processos->lista_processos(cpuglobal, processo_rodando_no_momento);
     } else if (comando == "help") {
         Utils::printar_help();
+    } else if (comando == "timer") {
+        processar_timer(args);
     }
-    else {
-        terminal_println(cpuglobal, Arch::Terminal::Type::Command, "Digite 'help'    para ver os comandos disponíveis");
-    }
+    else terminal_println(cpuglobal, Arch::Terminal::Type::Command, "Digite 'help'    para ver os comandos disponíveis");
 }
 
 void process_command(const std::string& palavra) {
@@ -481,6 +450,27 @@ void syscall_5_desalocar_memoria() {
     }
 }
 
+void syscall_6_dormir_processo() {
+    uint16_t segundos = cpuglobal->get_gpr(1);
+
+    terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "processo ", processo_rodando_no_momento->get_pid(), " vai dormir por ", segundos, " segundos");
+
+    processo_rodando_no_momento->salvar_contexto(cpuglobal);
+
+    gerenciador_processos->dormir_processo(processo_rodando_no_momento, segundos);
+
+    processo_rodando_no_momento = gerenciador_processos->configurar_proximo_processo(nullptr, idle);
+}
+
+void syscall_7_retornar_tempo_iniciacao() {
+    uint16_t tempo_sistema = gerenciador_processos->get_tempo_sistema();
+    uint16_t tempo_desde_criacao = tempo_sistema - processo_rodando_no_momento->get_tempo_criacao();
+
+    cpuglobal->set_gpr(1, tempo_desde_criacao);
+
+    terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "processo ", processo_rodando_no_momento->get_pid(), " tempo desde criação: ", tempo_desde_criacao, " segundos");
+}
+
 
 void boot(Arch::Cpu *cpu) {
     cpuglobal = cpu;
@@ -514,33 +504,25 @@ void boot(Arch::Cpu *cpu) {
 }
 
 bool load_program(const std::string& filename) {
-    if (!memory_manager) {
-        memory_manager = new MemoryManager(Config::phys_mem_size_words);
-    }
+    if (!memory_manager) memory_manager = new MemoryManager(Config::phys_mem_size_words);
 
-    try {
-        Process* processo = criar_e_configurar_processo(filename);
-        if (!processo) return false;
+    Process* processo = criar_e_configurar_processo(filename);
+    if (!processo) return false;
 
-        gerenciador_processos->push_back_processos_novos(processo);
+    gerenciador_processos->push_back_processos_novos(processo);
 
-        if (processo_rodando_no_momento == idle) {
-            processo_rodando_no_momento = processo;
-            processo->set_estado(ProcessState::running);
-            cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
-            cpuglobal->set_page_table(processo->get_tabela_paginas());
-            cpuglobal->set_pc(processo->get_pc());
-            for (uint16_t i = 0; i < Config::nregs; i++) cpuglobal->set_gpr(i, processo->get_regs(i));
-            terminal_println(cpuglobal, Terminal::Kernel, "trocando para processo: ", processo->get_name());
-        } else terminal_println(cpuglobal, Terminal::Kernel, "processo: ", processo->get_name(), " add a fila ");
-        Utils::exibir_info_processo(processo);
-        return true;
+    if (processo_rodando_no_momento == idle) {
+        processo_rodando_no_momento = gerenciador_processos->pop_front_processos_novos();
+        processo->set_estado(ProcessState::running);
+        cpuglobal->set_vmem_mode(Arch::Cpu::VmemMode::Paging);
+        cpuglobal->set_page_table(processo->get_tabela_paginas());
+        cpuglobal->set_pc(processo->get_pc());
+        for (uint16_t i = 0; i < Config::nregs; i++) cpuglobal->set_gpr(i, processo->get_regs(i));
+        terminal_println(cpuglobal, Terminal::Kernel, "trocando para processo: ", processo->get_name());
+    } else terminal_println(cpuglobal, Terminal::Kernel, "processo: ", processo->get_name(), " add praa fila ");
+    Utils::exibir_info_processo(processo);
+    return true;
 
-    } catch (const Mylib::Exception& e) {
-        terminal_println(cpuglobal, Terminal::Kernel, "execao brabissima!!!!!! tratandooou vamo matar ele!! ", e.what());
-        kill_process();
-        return false;
-    }
 }
 
 void interrupt(const Arch::InterruptCode interrupt) {
@@ -592,8 +574,18 @@ void syscall() {
             break;
         }
 
+        case 6: {
+            syscall_6_dormir_processo();
+            break;
+        }
+
+        case 7: {
+            syscall_7_retornar_tempo_iniciacao();
+            break;
+        }
+
         default:
-            terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "kakakka q porra de cod syscall é esse vei: ", cod_syscall);
+            terminal_println(cpuglobal, Arch::Terminal::Type::Kernel, "kakakka q porra de cod syscall é essa vei: ", cod_syscall);
             break;
 
     }
